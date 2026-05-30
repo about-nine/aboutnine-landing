@@ -1,0 +1,1744 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>about nine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link rel="stylesheet" href="./colors_and_type.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-user-drag: none; }
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 0;
+    overflow-x: clip;
+  }
+  .hero,
+  .dark-room,
+  .sphere-transition,
+  .story-cut,
+  .how-nine,
+  .final {
+    min-height: 100svh;
+    height: 100svh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  body {
+    background: #0d0d10;
+    color: var(--text-primary);
+    font-family: var(--font-ui);
+    font-size: 17px;
+    line-height: 1.7;
+    text-transform: lowercase;
+    overflow-x: clip;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .container { max-width: 1280px; margin: 0 auto; padding: 0 80px; }
+  section { padding: 120px 0; position: relative; }
+
+  .sphere-transition {
+    padding: 0;
+    background: transparent;
+  }
+  .sphere-departure {
+    min-height: 0;
+    height: 0;
+  }
+  .sphere-transition::before {
+    display: none;
+  }
+
+  /* ─── TOP NAV ─── */
+  .topnav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+    padding: 22px 0;
+    backdrop-filter: blur(14px);
+    background: rgba(20,20,22,0.65);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .topnav .row {
+    max-width: 1280px; margin: 0 auto; padding: 0 80px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .brand-lockup {
+    display: flex; align-items: center; gap: 10px; color: #fff;
+    font-family: var(--font-brand); font-size: 18px; font-weight: 600;
+    letter-spacing: -0.5px; text-decoration: none;
+  }
+  .nav-links { display: flex; gap: 32px; align-items: center; }
+  .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 14px; }
+  .nav-links a:hover { color: #fff; }
+  .nav-cta {
+    padding: 10px 18px; border-radius: 25px;
+    background: var(--grad-primary); color: #fff;
+    text-decoration: none; font-size: 14px; font-weight: 600;
+  }
+
+  /* ─── HERO ─── */
+  .hero {
+    padding: clamp(88px, 11vh, 118px) 0 clamp(44px, 6vh, 72px);
+    position: relative;
+    background: transparent;
+  }
+  .hero::after {
+    display: none;
+  }
+  .hero .grid {
+    display: grid; grid-template-columns: 1.05fr 0.95fr;
+    gap: 60px; align-items: center;
+  }
+  .hero h1 {
+    font-family: var(--font-brand); font-size: 96px; font-weight: 600;
+    letter-spacing: -2.5px; line-height: 1.02; color: #fff;
+  }
+  .hero h1 .accent { color: rgba(255,255,255,0.55); white-space: nowrap; }
+  .hero h1 .nobreak { white-space: nowrap; display: inline-block; }
+  .cta-row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-top: 28px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 16px 24px; border-radius: 999px; font-size: 15px; font-weight: 600;
+    cursor: pointer; border: none; text-decoration: none;
+    font-family: var(--font-ui); transition: opacity 0.2s ease;
+  }
+  .btn:hover { opacity: 0.92; }
+  .btn-primary { background: var(--grad-primary); color: #fff; }
+
+  /* Phone preview — chemistry-score screen, recreated */
+  .phone-wrap {
+    position: relative; display: flex; justify-content: center; align-items: center;
+  }
+  .phone-wrap::before {
+    content: ''; position: absolute; width: 540px; height: 540px;
+    border-radius: 50%;
+    background: radial-gradient(circle at center,
+      rgba(180, 160, 255, 0.30) 0%,
+      rgba(123, 91, 255, 0.18) 30%,
+      transparent 65%);
+    filter: blur(20px);
+    z-index: 0; pointer-events: none;
+    animation: bloom 6s ease-in-out infinite;
+  }
+  @keyframes bloom { 0%, 100% { opacity: 0.65; transform: scale(0.98); } 50% { opacity: 1.00; transform: scale(1.04); } }
+  .phone {
+    width: 380px; aspect-ratio: 9 / 19;
+    background: #0a0a0c;
+    border-radius: 52px;
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow:
+      0 80px 140px rgba(0,0,0,0.7),
+      0 30px 60px rgba(123,91,255,0.18),
+      0 0 0 1.5px rgba(255,255,255,0.04),
+      inset 0 0 0 1px rgba(255,255,255,0.04);
+    overflow: hidden; position: relative; z-index: 1;
+    padding: 12px;
+  }
+  .phone .bezel {
+    position: absolute; inset: 12px; border-radius: 40px;
+    overflow: hidden;
+    background:
+      radial-gradient(ellipse 80% 50% at 50% 45%, rgba(140,120,200,0.16) 0%, transparent 65%),
+      #1a1a1a;
+    display: flex; flex-direction: column;
+    padding: 60px 30px 60px;
+    align-items: center;
+    justify-content: center;
+    gap: 28px;
+  }
+  .phone .sphere-stage {
+    width: 220px; height: 220px;
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .phone .sphere-stage::before {
+    content: ''; position: absolute; inset: -30px;
+    background: radial-gradient(circle at center, rgba(220,200,255,0.18) 0%, transparent 60%);
+    filter: blur(10px); pointer-events: none;
+  }
+  .phone .app-sphere {
+    width: 100%; height: 100%; position: absolute; inset: 0;
+    animation: sphereSpin 60s linear infinite;
+  }
+  @keyframes sphereSpin { to { transform: rotate(360deg); } }
+  .phone .app-sphere ellipse {
+    fill: none; stroke: rgba(255,255,255,0.50); stroke-width: 0.7;
+  }
+  .phone .number {
+    font-family: var(--font-brand); font-size: 56px; font-weight: 400;
+    color: #fff; letter-spacing: 0; line-height: 1;
+    position: relative; z-index: 2; text-transform: none;
+  }
+  .phone .scr-caption {
+    font-family: var(--font-brand); font-size: 14px;
+    color: #fff; line-height: 1.9;
+    text-align: center; opacity: 0.92;
+    text-transform: none;
+  }
+  .phone .glass {
+    position: absolute; inset: 12px; border-radius: 40px; pointer-events: none;
+    background: linear-gradient(135deg,
+      rgba(255,255,255,0.08) 0%,
+      rgba(255,255,255,0) 30%,
+      rgba(255,255,255,0) 70%,
+      rgba(255,255,255,0.04) 100%);
+    z-index: 3;
+  }
+  .phone-wrap::after {
+    content: ''; position: absolute;
+    bottom: -50px; left: 50%; transform: translateX(-50%);
+    width: 320px; height: 36px; border-radius: 50%;
+    background: radial-gradient(ellipse at center,
+      rgba(123,91,255,0.30) 0%,
+      rgba(123,91,255,0) 70%);
+    filter: blur(14px);
+    z-index: 0; pointer-events: none;
+  }
+  /* ─── DARK ROOM (section 2) ─── */
+  .dark-room {
+    text-align: center;
+    padding: 200px 0 220px;
+    background: transparent;
+    position: relative;
+    overflow: hidden;
+  }
+  .dark-room::before {
+    display: none;
+  }
+  .dark-room::after {
+    display: none;
+  }
+
+  /* starfield of tiny asterisks */
+  .starfield {
+    position: absolute; inset: 0; pointer-events: none;
+    z-index: 0;
+    color: #fff;
+  }
+  .starfield svg { width: 100%; height: 100%; display: block; }
+  .starfield .twinkle { animation: twinkle 5s ease-in-out infinite; }
+  .starfield .twinkle.d1 { animation-delay: 1.2s; }
+  .starfield .twinkle.d2 { animation-delay: 2.4s; }
+  .starfield .twinkle.d3 { animation-delay: 3.6s; }
+  @keyframes twinkle { 0%, 100% { opacity: 0.10; } 50% { opacity: 0.45; } }
+
+  .dark-room .container { position: relative; z-index: 3; }
+
+  .dark-room .quote {
+    font-family: var(--font-brand);
+    font-size: 64px; font-weight: 600;
+    letter-spacing: -1.4px; line-height: 1.2; color: #fff;
+    max-width: 920px; margin: 0 auto;
+  }
+  .dark-room .quote .light { color: rgba(255,255,255,0.42); }
+  .dark-room .quote em.kindred {
+    font-style: normal;
+    background: linear-gradient(90deg, #e6d4ff 0%, #c8d6ff 100%);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    font-weight: 600;
+  }
+  .dark-room-sub {
+    margin-top: 38px;
+    font-family: var(--font-brand);
+    font-size: 16px; line-height: 1.7; color: var(--text-secondary);
+    max-width: 460px; margin-left: auto; margin-right: auto;
+    font-style: italic;
+  }
+
+  /* ─── STORY CUTS AFTER DARK ROOM ─── */
+  .story-cut {
+    position: relative;
+    padding: 0;
+    overflow: hidden;
+    isolation: isolate;
+    background: transparent;
+  }
+  .story-cut::before {
+    display: none;
+  }
+  .story-cut::after {
+    content: '';
+    position: absolute;
+    inset: auto 8vw 0;
+    height: 1px;
+    z-index: 0;
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.14), transparent);
+  }
+  .story-cut.what-panel::after {
+    content: none;
+    display: none;
+    height: 0;
+    background: none;
+  }
+  .story-cut .container {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+  }
+  .story-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(360px, 1.1fr);
+    gap: clamp(48px, 8vw, 112px);
+    align-items: center;
+  }
+  .story-cut.reverse .story-grid {
+    grid-template-columns: minmax(360px, 1.08fr) minmax(0, 0.92fr);
+  }
+  .story-cut.reverse .story-copy { order: 2; }
+  .story-kicker {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    color: rgba(255,255,255,0.42);
+    letter-spacing: 0.26em;
+    text-transform: uppercase;
+    margin-bottom: 22px;
+  }
+  .story-copy h2 {
+    font-family: var(--font-brand);
+    font-size: clamp(42px, 5.4vw, 82px);
+    font-weight: 600;
+    line-height: 1.06;
+    letter-spacing: -1.4px;
+    color: #fff;
+    max-width: 690px;
+  }
+  .story-copy h2 .light {
+    color: rgba(255,255,255,0.50);
+  }
+  .story-copy p {
+    margin-top: 28px;
+    max-width: 430px;
+    font-size: 16px;
+    line-height: 1.8;
+    color: var(--text-secondary);
+  }
+  .story-copy {
+    position: relative;
+    z-index: 3;
+  }
+  .story-visual {
+    position: relative;
+    min-height: 520px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .story-visual::before {
+    content: '';
+    position: absolute;
+    width: min(90%, 560px);
+    height: 68%;
+    border-radius: 50%;
+    background:
+      radial-gradient(ellipse at center, rgba(123,91,255,0.16), transparent 66%),
+      radial-gradient(ellipse at 62% 46%, rgba(244,197,66,0.09), transparent 58%);
+    filter: blur(32px);
+    opacity: 0.9;
+  }
+  .story-visual.what-sphere-slot::before {
+    opacity: 0;
+  }
+
+  .what-sphere-video {
+    --sphere-opacity: 0;
+    --what-left: 50%;
+    --what-top: 51%;
+    --what-scale: 1;
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    width: 100vw;
+    height: 100svh;
+    pointer-events: none;
+    opacity: var(--sphere-opacity);
+    visibility: hidden;
+    transform: none;
+    transition: none;
+    will-change: opacity;
+  }
+  .what-sphere-video.is-unavailable {
+    display: none;
+  }
+  .what-sphere-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .how-nine {
+    position: relative;
+    min-height: 100svh;
+    height: auto;
+    padding: clamp(92px, 12vh, 124px) 0 clamp(72px, 10vh, 110px);
+    overflow: hidden;
+    isolation: isolate;
+    background: transparent;
+  }
+  .how-nine::before {
+    display: none;
+  }
+  .how-nine .container {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+  }
+  .how-nine-inner {
+    max-width: 1120px;
+    margin: 0 auto;
+  }
+  .how-nine-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 32px;
+    margin-bottom: 34px;
+  }
+  .how-nine h2 {
+    font-family: var(--font-brand);
+    font-size: clamp(38px, 4.2vw, 66px);
+    font-weight: 600;
+    line-height: 1.06;
+    letter-spacing: -1.2px;
+    color: #fff;
+    margin: 0;
+    text-transform: none;
+  }
+  .how-nine h2 .light {
+    color: rgba(255,255,255,0.50);
+  }
+  .how-work-shell {
+    position: relative;
+    min-height: clamp(610px, 72vh, 760px);
+  }
+  .how-work-layout {
+    display: grid;
+    grid-template-columns: minmax(240px, 390px) minmax(0, 1fr);
+    gap: clamp(44px, 7vw, 96px);
+    align-items: center;
+    min-height: inherit;
+  }
+  .how-phone-stage {
+    position: relative;
+    width: min(380px, 34vw, 38vh);
+    margin: 0 auto;
+  }
+  .how-work-phone {
+    width: 100%;
+    min-height: 0;
+    margin: 0 auto;
+    transform: none;
+    transition: none;
+  }
+  .how-phone-nav {
+    position: absolute;
+    top: 50%;
+    z-index: 4;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 46px;
+    height: 46px;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 34% 28%, rgba(255,255,255,0.18), transparent 32%),
+      rgba(18,18,24,0.80);
+    color: rgba(255,255,255,0.86);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    transform: translateY(-50%);
+    transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+  }
+  .how-phone-nav:hover {
+    transform: translateY(calc(-50% - 1px));
+    border-color: rgba(255,255,255,0.26);
+    background:
+      radial-gradient(circle at 34% 28%, rgba(255,255,255,0.26), transparent 32%),
+      rgba(35,32,48,0.86);
+  }
+  .how-phone-nav.prev {
+    left: -70px;
+  }
+  .how-phone-nav.next {
+    right: -70px;
+  }
+  .how-phone-nav[hidden] {
+    display: none;
+  }
+  .how-copy-stack {
+    display: grid;
+    align-items: center;
+    min-height: 260px;
+  }
+  .how-work-copy {
+    grid-area: 1 / 1;
+    position: relative;
+    opacity: 0;
+    transform: translateY(12px);
+    pointer-events: none;
+    transition: opacity 0.34s ease, transform 0.34s ease;
+  }
+  .how-work-copy.active {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+  .how-work-copy h3 {
+    max-width: 520px;
+    font-family: var(--font-brand);
+    font-size: clamp(32px, 3.4vw, 54px);
+    font-weight: 600;
+    line-height: 1.08;
+    letter-spacing: -0.8px;
+    color: #fff;
+    margin-bottom: 22px;
+  }
+  .how-work-copy h3 .light {
+    color: rgba(255,255,255,0.48);
+  }
+  .how-work-copy p {
+    max-width: 440px;
+    color: var(--text-secondary);
+    font-size: 16px;
+    line-height: 1.74;
+  }
+  .how-phone-screens {
+    position: absolute;
+    inset: 12px;
+    z-index: 1;
+    border-radius: 40px;
+    overflow: hidden;
+    background:
+      linear-gradient(180deg, #4a4a4a 0%, #1a1a1a 100%);
+  }
+  .how-phone-screen {
+    position: absolute;
+    inset: 0;
+    min-height: 0;
+    height: auto;
+    padding: 30px 20px calc(26px + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    flex-direction: column;
+    background: transparent;
+    color: #fff;
+    font-family: "Merriweather", var(--font-brand), serif;
+    opacity: 0;
+    transform: translateX(10px);
+    pointer-events: none;
+    transition: opacity 0.34s ease, transform 0.34s ease;
+  }
+  .how-phone-screen.active {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+  }
+  .how-phone-screen::before {
+    display: none;
+  }
+  .proto-lounge,
+  .proto-option,
+  .proto-result {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .proto-brand {
+    color: #fff;
+    font-family: "Merriweather", var(--font-brand), serif;
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
+    line-height: 1.15;
+  }
+  .proto-brand {
+    color: rgba(255,255,255,0.72);
+    text-align: left;
+    margin-bottom: 18px;
+  }
+  .proto-tabs {
+    display: flex;
+    gap: 0;
+    width: 100%;
+    padding: 4px;
+    border-radius: 24px;
+    background: #3a3a3a;
+    margin-bottom: 20px;
+  }
+  .proto-tabs span {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 8px;
+    border-radius: 20px;
+    color: #b0b0b0;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1;
+  }
+  .proto-tabs span.active {
+    color: #fff;
+    background: #2a2a2a;
+  }
+  .proto-content {
+    flex: 1;
+    overflow: hidden;
+  }
+  .proto-subtitle {
+    margin-bottom: 10px;
+    color: #b0b0b0;
+    text-align: center;
+    font-size: 13px;
+    line-height: 1.3;
+  }
+  .proto-user-list {
+    display: grid;
+    gap: 8px;
+  }
+  .proto-user-row {
+    position: relative;
+    min-height: 50px;
+    min-width: 0;
+    width: 100%;
+  }
+  .proto-user-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+    min-height: 50px;
+    padding: 12px 74px 12px 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.20);
+    background: #3a3a3a;
+    color: #fff;
+    overflow: hidden;
+  }
+  .proto-user-card > div { min-width: 0; }
+  .proto-user-name {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.1;
+  }
+  .proto-status {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #4ecb71;
+    display: inline-block;
+  }
+  .proto-track {
+    margin-top: 5px;
+    color: #b0b0b0;
+    font-size: 10px;
+    line-height: 1.2;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .proto-track-inner {
+    display: inline-flex;
+    align-items: center;
+    gap: 28px;
+    animation: protoTicker var(--ticker-dur, 20s) linear infinite;
+    will-change: transform;
+  }
+  .proto-track-inner > span { white-space: nowrap; }
+  @keyframes protoTicker {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+  .proto-start {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    z-index: 1;
+    transform: translateY(-50%);
+    width: auto;
+    padding: 8px 13px;
+    border: 0;
+    border-radius: 25px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .proto-bottom-nav {
+    height: 42px;
+    margin: auto -20px -26px;
+    background: linear-gradient(to top, rgba(42,42,42,1), rgba(42,42,42,0));
+  }
+  .proto-option {
+    justify-content: flex-start;
+    text-align: center;
+  }
+  .proto-option-head { margin-bottom: 8px; }
+  .proto-carousel-wrap { justify-content: flex-start; }
+  .proto-topic {
+    width: fit-content;
+    margin: 0 auto 14px;
+    padding: 7px 18px;
+    border-radius: 20px;
+    background: #525252;
+    color: #fff;
+    font-size: 13px;
+    line-height: 1;
+  }
+  .proto-question {
+    font-size: 14px;
+    line-height: 1.45;
+    white-space: pre-line;
+    color: #fff;
+  }
+  .proto-carousel-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 0;
+  }
+  .proto-dots {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 18px;
+  }
+  .proto-dots i {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #525252;
+  }
+  .proto-dots i.active {
+    width: 18px;
+    border-radius: 4px;
+    background: #fff;
+  }
+  .proto-carousel {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    align-items: center;
+    width: 100%;
+  }
+  .proto-food-card {
+    min-width: 0;
+    opacity: 0.4;
+    transform: scale(0.86);
+  }
+  .proto-food-card.center {
+    opacity: 1;
+    transform: scale(1);
+  }
+  .proto-food-card img {
+    width: 100%;
+    aspect-ratio: 0.78 / 1;
+    object-fit: cover;
+    border-radius: 18px;
+    border: 2px solid transparent;
+  }
+  .proto-food-card.center img {
+    border-color: #fff;
+  }
+  .proto-food-card span {
+    display: block;
+    margin-top: 10px;
+    color: #fff;
+    text-align: center;
+    font-size: 11px;
+    line-height: 1.25;
+  }
+  .proto-enter {
+    width: 100%;
+    padding: 15px;
+    border: 0;
+    border-radius: 25px;
+    background: #fff;
+    color: #2a2a2a;
+    font: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1;
+  }
+  .proto-result .proto-brand {
+    margin-bottom: 16px;
+  }
+  .proto-option .proto-brand {
+    margin-bottom: 80px;
+  }
+  .proto-chat {
+    flex: 1;
+    display: grid;
+    align-content: start;
+    gap: 8px;
+    min-height: 0;
+    padding-top: 4px;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  .proto-chat::-webkit-scrollbar { display: none; }
+  .proto-speaker {
+    margin-bottom: 3px;
+    color: rgba(255,255,255,0.62);
+    font-size: 10px;
+    line-height: 1;
+    text-transform: lowercase;
+  }
+  .proto-row {
+    display: flex;
+    gap: 9px;
+    align-items: flex-start;
+  }
+  .proto-row.mine {
+    justify-content: flex-end;
+  }
+  .proto-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #c471ed 0%, #f64f59 100%);
+    flex-shrink: 0;
+  }
+  .proto-bubble {
+    width: fit-content;
+    max-width: 72%;
+    padding: 7px 12px;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.20);
+    background: #525252;
+    color: #fff;
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: normal;
+  }
+  .proto-bubble.mine {
+    color: #fff;
+    background: linear-gradient(135deg, #5b7fff, #7b5bff);
+  }
+  .proto-input-area {
+    flex-shrink: 0;
+    display: flex;
+    gap: 10px;
+    align-items: stretch;
+    padding-top: 14px;
+  }
+  .proto-select {
+    flex: 1;
+    min-height: 44px;
+    padding: 0 18px;
+    border-radius: 28px;
+    background: #3a3a3a;
+    color: #fff;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+  }
+  .proto-send {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #5b7fff, #7b5bff);
+    position: relative;
+    flex-shrink: 0;
+  }
+  .proto-send::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 18px;
+    height: 18px;
+    transform: translate(-50%, -50%);
+    background-image: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 10H16M16 10L11 5M16 10L11 15' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+  }
+  /* ─── HOW IT WORKS ─── */
+  .section-eyebrow {
+    font-family: var(--font-ui); font-size: 11px; letter-spacing: 0.3em;
+    text-transform: uppercase; color: var(--text-brand-gray); margin-bottom: 18px;
+  }
+
+  /* ─── FINAL CTA ─── */
+  .final {
+    text-align: center; padding: 180px 0;
+    background:
+      radial-gradient(ellipse 60% 40% at 50% 50%, rgba(118,75,162,0.20), transparent 70%);
+    position: relative;
+  }
+  .final h2 {
+    font-family: var(--font-brand); font-size: 96px; font-weight: 600;
+    letter-spacing: -2.5px; line-height: 1.02; color: #fff; margin-bottom: 28px;
+  }
+  .final h2 .light { color: rgba(255,255,255,0.55); }
+  .final p { font-size: 16px; color: var(--text-secondary); margin-bottom: 40px; max-width: 480px; margin-left: auto; margin-right: auto; }
+  .final .btn-primary { padding: 18px 30px; font-size: 16px; }
+
+  /* ─── FOOTER ─── */
+  footer {
+    padding: 36px 0;
+    background: #08080a;
+  }
+  footer .footer-row {
+    max-width: 1280px; margin: 0 auto; padding: 0 80px;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 24px; flex-wrap: wrap;
+  }
+  footer .footer-copy {
+    font-size: 12px; color: var(--text-brand-gray);
+    text-transform: none; letter-spacing: 0;
+  }
+  footer .footer-meta {
+    display: flex; gap: 28px; align-items: center;
+    font-size: 13px; color: var(--text-secondary);
+    text-transform: none; letter-spacing: 0;
+  }
+  footer .footer-meta a {
+    color: var(--text-secondary); text-decoration: none;
+  }
+  footer .footer-meta a:hover { color: #fff; }
+  footer .row {
+    max-width: 1280px; margin: 0 auto; padding: 0 80px;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px;
+  }
+  footer a { color: var(--text-secondary); text-decoration: none; font-size: 13px; }
+  footer a:hover { color: #fff; }
+
+  /* ─── RESPONSIVE ─── */
+  @media (max-width: 960px) {
+    .container, .topnav .row { padding: 0 32px; }
+    footer .footer-row { padding: 0 32px; flex-direction: column; align-items: flex-start; gap: 12px; }
+    footer .footer-meta { flex-wrap: wrap; gap: 16px; }
+    section { padding: 80px 0; }
+    .hero { padding: 66px 0 0; }
+    .hero .grid { grid-template-columns: 1fr; gap: 20px; text-align: center; }
+    .hero h1 { font-size: 56px; letter-spacing: -1.5px; }
+    .cta-row { justify-content: center; }
+    .phone-wrap { transform: none; max-width: 240px; margin: 0 auto; }
+    .hero .phone { width: 100%; min-height: 0; max-height: 45vh; overflow: hidden; }
+    .phone { width: 100%; height: auto; min-height: 580px; }
+    .dark-room { padding: 120px 0; }
+    .dark-room .quote { font-size: 38px; letter-spacing: -0.6px; }
+    .story-cut {
+      height: auto;
+      min-height: 100svh;
+      padding: 104px 0 88px;
+    }
+    .story-grid,
+    .story-cut.reverse .story-grid {
+      grid-template-columns: 1fr;
+      gap: 36px;
+    }
+    .story-cut.reverse .story-copy { order: 0; }
+    .story-copy h2 {
+      font-size: 40px;
+      letter-spacing: -0.6px;
+    }
+    .story-copy p {
+      max-width: 100%;
+      margin-top: 18px;
+    }
+    .story-visual {
+      min-height: 380px;
+    }
+    .what-sphere-video {
+      width: 100vw;
+      height: 100svh;
+      z-index: 1;
+    }
+    .how-nine {
+      height: auto;
+      min-height: 100svh;
+      padding: 104px 0 88px;
+    }
+    .how-nine-header {
+      align-items: flex-start;
+      gap: 22px;
+      margin-bottom: 26px;
+    }
+    .how-work-shell {
+      min-height: 800px;
+    }
+    .how-work-layout {
+      grid-template-columns: 1fr;
+      gap: 30px;
+      align-content: start;
+    }
+    .how-copy-stack {
+      min-height: 250px;
+    }
+    .how-phone-stage {
+      width: 100%;
+      padding: 0 50px;
+    }
+    .how-phone-nav {
+      width: 42px;
+      height: 42px;
+    }
+    .how-phone-nav.prev {
+      left: 0;
+    }
+    .how-phone-nav.next {
+      right: 0;
+    }
+    .how-work-shell .how-phone-screen {
+      inset: 12px;
+      min-height: 0;
+      height: auto;
+      padding: 22px 12px calc(20px + env(safe-area-inset-bottom, 0px));
+    }
+    .how-work-shell .proto-brand {
+      font-size: 15px;
+      margin-bottom: 12px;
+    }
+    .how-work-shell .proto-tabs {
+      margin-bottom: 14px;
+    }
+    .how-work-shell .proto-tabs span {
+      padding: 7px 4px;
+      font-size: 11px;
+    }
+    .how-work-shell .proto-subtitle {
+      font-size: 11px;
+      margin-bottom: 8px;
+    }
+    .how-work-shell .proto-user-list {
+      gap: 6px;
+    }
+    .how-work-shell .proto-user-row {
+      min-height: 44px;
+    }
+    .how-work-shell .proto-user-card {
+      min-height: 44px;
+      padding: 10px 62px 10px 10px;
+    }
+    .how-work-shell .proto-user-name {
+      font-size: 12px;
+    }
+    .how-work-shell .proto-track {
+      font-size: 9px;
+    }
+    .how-work-shell .proto-start {
+      right: 6px;
+      padding: 6px 10px;
+      font-size: 10px;
+    }
+    .how-work-shell .proto-bottom-nav {
+      margin: auto -12px -20px;
+    }
+    .how-work-shell .proto-enter {
+      padding: 11px;
+      font-size: 13px;
+    }
+    .how-work-shell .proto-avatar {
+      width: 26px;
+      height: 26px;
+    }
+    .how-work-shell .proto-bubble {
+      font-size: 11px;
+      max-width: 80%;
+    }
+    .how-work-shell .proto-select {
+      min-height: 38px;
+      padding: 0 12px;
+      font-size: 12px;
+    }
+    .how-work-shell .proto-send {
+      width: 38px;
+      height: 38px;
+    }
+    .how-work-copy h3 {
+      font-size: 36px;
+      margin-bottom: 16px;
+    }
+    .nav-links { display: none; }
+    .final h2 { font-size: 50px; }
+
+    /* ─── MOBILE HOW NINE LAYOUT ─── */
+    .how-nine--mobile {
+      overflow: visible !important;
+      min-height: 0 !important;
+      padding-bottom: 72px !important;
+    }
+    .how-nine--mobile .how-work-shell { display: none; }
+    .how-mobile { display: flex; flex-direction: column; }
+    .how-mobile-item { margin-bottom: 72px; }
+    .how-mobile-item:last-child { margin-bottom: 0; }
+    .how-mobile-copy { margin-bottom: 28px; }
+    .how-mobile-copy h3 {
+      font-family: var(--font-brand);
+      font-size: 40px;
+      font-weight: 600;
+      line-height: 1.06;
+      letter-spacing: -0.6px;
+      color: #fff;
+      text-transform: none;
+    }
+    .how-mobile-copy .light { color: rgba(255,255,255,0.50); }
+    .how-mobile-copy p {
+      margin-top: 18px;
+      font-size: 16px;
+      line-height: 1.8;
+      color: var(--text-secondary);
+    }
+    .how-mobile-phone-wrap {
+      max-width: 280px;
+      margin: 0 auto;
+    }
+    .phone.how-mobile-phone {
+      width: 100%;
+      min-height: 0 !important;
+    }
+    .phone.how-mobile-phone .how-phone-screen {
+      padding: 22px 12px calc(20px + env(safe-area-inset-bottom, 0px));
+    }
+    .how-mobile-phone .proto-brand { font-size: 15px; margin-bottom: 12px; }
+    .how-mobile-phone .proto-option .proto-brand { margin-bottom: 64px; }
+    .how-mobile-phone .proto-option .proto-carousel-wrap { justify-content: center; }
+    .how-mobile-phone .proto-tabs { margin-bottom: 14px; }
+    .how-mobile-phone .proto-tabs span { padding: 7px 4px; font-size: 11px; }
+    .how-mobile-phone .proto-subtitle { font-size: 11px; margin-bottom: 8px; }
+    .how-mobile-phone .proto-user-list { gap: 6px; }
+    .how-mobile-phone .proto-user-row { min-height: 44px; }
+    .how-mobile-phone .proto-user-card { min-height: 44px; padding: 10px 62px 10px 10px; }
+    .how-mobile-phone .proto-user-name { font-size: 12px; }
+    .how-mobile-phone .proto-track { font-size: 9px; }
+    .how-mobile-phone .proto-start { right: 6px; padding: 6px 10px; font-size: 10px; }
+    .how-mobile-phone .proto-bottom-nav { margin: auto -12px -20px; }
+    .how-mobile-phone .proto-enter { padding: 11px; font-size: 13px; }
+    .how-mobile-phone .proto-avatar { width: 26px; height: 26px; }
+    .how-mobile-phone .proto-bubble { font-size: 11px; max-width: 80%; }
+    .how-mobile-phone .proto-select { min-height: 38px; padding: 0 12px; font-size: 12px; }
+    .how-mobile-phone .proto-send { width: 38px; height: 38px; }
+  }
+
+  /* ─── PROTO PROFILE CARD ─── */
+  .proto-profile-card {
+    padding: 14px 16px;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.18);
+    background: #3a3a3a;
+    min-width: 160px;
+    text-align: left;
+  }
+  .proto-profile-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 4px;
+  }
+  .proto-profile-meta {
+    font-size: 10px;
+    color: #b0b0b0;
+    margin-bottom: 10px;
+    line-height: 1.4;
+  }
+  .proto-profile-btn {
+    display: inline-block;
+    padding: 5px 12px;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.12);
+    color: rgba(255,255,255,0.80);
+    font-size: 10px;
+    font-weight: 600;
+    border: 0;
+    cursor: default;
+    font: inherit;
+    font-size: 10px;
+    line-height: 1;
+  }
+
+  /* ─── PROTO SCORE CARD ─── */
+  .proto-score-card {
+    padding: 14px 16px;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.18);
+    background: #3a3a3a;
+    text-align: left;
+  }
+  .proto-score-value {
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 4px;
+  }
+  .proto-score-desc {
+    font-size: 10px;
+    color: #b0b0b0;
+    margin-bottom: 10px;
+    line-height: 1.4;
+  }
+  .proto-score-btn {
+    display: inline-block;
+    padding: 5px 12px;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.12);
+    color: rgba(255,255,255,0.80);
+    font: inherit;
+    font-size: 10px;
+    line-height: 1;
+    border: 0;
+    cursor: default;
+  }
+
+  /* ─── PROTO CHAT ANIMATION ─── */
+  .proto-result .proto-row {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  .proto-result .proto-row.proto-msg-in {
+    animation: protoChatIn 0.36s cubic-bezier(0.2, 1, 0.4, 1) forwards;
+  }
+  @keyframes protoChatIn {
+    to { opacity: 1; transform: translateY(0); }
+  }
+  /* ─── FOOD CARD SELECTION ─── */
+  .proto-food-card.center img { border-color: #fff; }
+
+  /* ─── SCROLL REVEAL ─── */
+  .reveal {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1),
+                transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: opacity, transform;
+  }
+  .reveal.in { opacity: 1; transform: translateY(0); }
+  .reveal.d1 { transition-delay: 0.08s; }
+  .reveal.d2 { transition-delay: 0.18s; }
+  .reveal.d3 { transition-delay: 0.28s; }
+
+  /* ─── ODOMETER SCORE ─── */
+  .number.odometer {
+    display: inline-flex;
+    align-items: flex-start;
+    justify-content: center;
+  }
+  .odometer-digit {
+    display: inline-block;
+    overflow: hidden;
+    height: 1em;
+  }
+  .odometer-digit.hidden { width: 0; }
+  .odometer-digit-inner {
+    display: flex;
+    flex-direction: column;
+    will-change: transform;
+    transition: transform 0.38s cubic-bezier(0.32, 1, 0.5, 1);
+  }
+  .odometer-digit-inner span {
+    display: block;
+    height: 1em;
+    line-height: 1;
+    text-align: center;
+  }
+
+  /* ─── SCROLL HINT ─── */
+  .scroll-hint {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.35);
+    animation: scrollHintBlink 2.8s ease-in-out infinite;
+  }
+  @keyframes scrollHintBlink {
+    0%, 100% { opacity: 0.9; }
+    50% { opacity: 0.12; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { transition: none; opacity: 1; transform: none; }
+    .scroll-hint { animation: none; opacity: 0.4; }
+    .odometer-digit-inner { transition: none; }
+    .proto-track-inner { animation: none; }
+    .proto-result .proto-row { opacity: 1; transform: none; }
+    .proto-result .proto-row.proto-msg-in { animation: none; }
+  }
+</style>
+<link rel="stylesheet" href="./interactive.css">
+</head>
+<body>
+
+<canvas class="night-canvas" id="nightCanvas" aria-hidden="true" width="2560" height="1440"></canvas>
+<div class="cursor-light" aria-hidden="true"></div>
+<div class="grain-layer" aria-hidden="true"></div>
+
+<!-- ─── TOP NAV ─── -->
+<nav class="topnav">
+  <div class="row">
+    <a href="#" class="brand-lockup">
+      about nine
+    </a>
+    <div class="nav-links">
+      <a href="#sphere-approach" class="nav-menu-link">what you get</a>
+      <a href="#how-intro" class="nav-menu-link">how it works</a>
+      <a href="#cta" class="nav-cta">join the waitlist</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ─── HERO ─── -->
+<section class="hero" id="top">
+  <div class="container">
+    <div class="grid">
+      <div>
+        <h1 class="reveal"><span class="nobreak">kindred souls</span><br><span class="nobreak">matched by voice</span></h1>
+        <div class="cta-row reveal d1">
+          <a href="#cta" class="btn btn-primary">
+            join the waitlist
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"></path></svg>
+          </a>
+        </div>
+      </div>
+
+      <!-- score visual -->
+      <div class="phone-wrap">
+        <div class="phone">
+          <div class="bezel">
+            <div class="sphere-stage">
+              <svg class="app-sphere" viewBox="-100 -100 200 200" preserveAspectRatio="xMidYMid meet">
+                <g>
+                  <ellipse rx="82" ry="30"></ellipse>
+                  <ellipse rx="82" ry="30" transform="rotate(30)"></ellipse>
+                  <ellipse rx="82" ry="30" transform="rotate(60)"></ellipse>
+                  <ellipse rx="82" ry="30" transform="rotate(90)"></ellipse>
+                  <ellipse rx="82" ry="30" transform="rotate(120)"></ellipse>
+                  <ellipse rx="82" ry="30" transform="rotate(150)"></ellipse>
+                </g>
+              </svg>
+              <div class="number" data-hero-score-value="">50</div>
+            </div>
+            <div class="scr-caption" data-hero-score-caption="">
+              Probably not the one.<br>
+              Whether to continue is up to you.
+            </div>
+            <div class="scroll-hint" aria-hidden="true">scroll down</div>
+          </div>
+          <div class="glass"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── DARK ROOM ─── -->
+<section class="dark-room" id="kindred" style="--dark-y: 20.00px;">
+  <!-- starfield of dim asterisks -->
+  <div class="starfield">
+    <svg viewBox="0 0 1400 600" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <symbol id="ast-star" viewBox="0 0 100 100">
+          <g fill="currentColor">
+            <rect x="46" y="6" width="8" height="88" rx="4"></rect>
+            <rect x="46" y="6" width="8" height="88" rx="4" transform="rotate(60 50 50)"></rect>
+            <rect x="46" y="6" width="8" height="88" rx="4" transform="rotate(120 50 50)"></rect>
+          </g>
+        </symbol>
+      </defs>
+
+      <!-- left field -->
+      <use href="#ast-star" x="60" y="70" width="6" height="6" opacity="0.20"></use>
+      <use href="#ast-star" x="120" y="140" width="8" height="8" opacity="0.25"></use>
+      <use href="#ast-star" x="40" y="220" width="7" height="7" opacity="0.18"></use>
+      <use href="#ast-star" x="180" y="60" width="10" height="10" opacity="0.32" class="twinkle"></use>
+      <use href="#ast-star" x="240" y="180" width="6" height="6" opacity="0.15"></use>
+      <use href="#ast-star" x="80" y="320" width="10" height="10" opacity="0.28"></use>
+      <use href="#ast-star" x="150" y="270" width="5" height="5" opacity="0.12"></use>
+      <use href="#ast-star" x="220" y="380" width="8" height="8" opacity="0.22"></use>
+      <use href="#ast-star" x="60" y="460" width="7" height="7" opacity="0.18"></use>
+      <use href="#ast-star" x="140" y="540" width="9" height="9" opacity="0.25" class="twinkle d2"></use>
+      <use href="#ast-star" x="280" y="320" width="6" height="6" opacity="0.15"></use>
+      <use href="#ast-star" x="310" y="90" width="7" height="7" opacity="0.20"></use>
+      <use href="#ast-star" x="350" y="450" width="10" height="10" opacity="0.30"></use>
+      <use href="#ast-star" x="210" y="510" width="6" height="6" opacity="0.15"></use>
+      <use href="#ast-star" x="380" y="220" width="5" height="5" opacity="0.10"></use>
+      <use href="#ast-star" x="440" y="90" width="6" height="6" opacity="0.18"></use>
+      <use href="#ast-star" x="460" y="400" width="7" height="7" opacity="0.20"></use>
+      <use href="#ast-star" x="400" y="550" width="8" height="8" opacity="0.22"></use>
+      <use href="#ast-star" x="270" y="540" width="5" height="5" opacity="0.10"></use>
+      <use href="#ast-star" x="370" y="30" width="6" height="6" opacity="0.15"></use>
+
+      <!-- right field -->
+      <use href="#ast-star" x="960" y="70" width="7" height="7" opacity="0.20"></use>
+      <use href="#ast-star" x="1010" y="160" width="9" height="9" opacity="0.28" class="twinkle d1"></use>
+      <use href="#ast-star" x="1060" y="90" width="6" height="6" opacity="0.16"></use>
+      <use href="#ast-star" x="1130" y="200" width="8" height="8" opacity="0.22"></use>
+      <use href="#ast-star" x="1180" y="70" width="7" height="7" opacity="0.18"></use>
+      <use href="#ast-star" x="1240" y="130" width="10" height="10" opacity="0.30"></use>
+      <use href="#ast-star" x="1290" y="240" width="6" height="6" opacity="0.15"></use>
+      <use href="#ast-star" x="1330" y="90" width="7" height="7" opacity="0.18"></use>
+      <use href="#ast-star" x="1080" y="340" width="9" height="9" opacity="0.25"></use>
+      <use href="#ast-star" x="1180" y="380" width="6" height="6" opacity="0.16"></use>
+      <use href="#ast-star" x="1240" y="460" width="8" height="8" opacity="0.22" class="twinkle d3"></use>
+      <use href="#ast-star" x="1130" y="460" width="7" height="7" opacity="0.18"></use>
+      <use href="#ast-star" x="1300" y="380" width="6" height="6" opacity="0.14"></use>
+      <use href="#ast-star" x="970" y="460" width="9" height="9" opacity="0.25"></use>
+      <use href="#ast-star" x="1030" y="540" width="7" height="7" opacity="0.18"></use>
+      <use href="#ast-star" x="1190" y="540" width="8" height="8" opacity="0.20"></use>
+      <use href="#ast-star" x="1320" y="500" width="6" height="6" opacity="0.14"></use>
+      <use href="#ast-star" x="970" y="240" width="6" height="6" opacity="0.15"></use>
+      <use href="#ast-star" x="1060" y="250" width="5" height="5" opacity="0.10"></use>
+      <use href="#ast-star" x="1280" y="30" width="6" height="6" opacity="0.15"></use>
+
+      <!-- thin center scatter (avoid the orb-row band ~ y 270–350) -->
+      <use href="#ast-star" x="520" y="80" width="5" height="5" opacity="0.12"></use>
+      <use href="#ast-star" x="700" y="60" width="6" height="6" opacity="0.15" class="twinkle"></use>
+      <use href="#ast-star" x="820" y="90" width="5" height="5" opacity="0.10"></use>
+      <use href="#ast-star" x="650" y="520" width="5" height="5" opacity="0.12"></use>
+      <use href="#ast-star" x="750" y="560" width="6" height="6" opacity="0.16"></use>
+      <use href="#ast-star" x="870" y="510" width="5" height="5" opacity="0.10"></use>
+      <use href="#ast-star" x="600" y="480" width="4" height="4" opacity="0.08"></use>
+      <use href="#ast-star" x="790" y="30" width="4" height="4" opacity="0.08"></use>
+    </svg>
+  </div>
+
+  <div class="container">
+    <blockquote class="quote">
+      a thousand voices in the dark.<br>
+      <span class="light">one of them, <em class="kindred">kindred</em>.</span>
+    </blockquote>
+    <p class="dark-room-sub">we hope you find one and stay there.</p>
+  </div>
+</section>
+
+<section class="sphere-transition sphere-approach" id="sphere-approach">
+  <div class="what-intro-copy">
+    <div class="story-kicker">what you get</div>
+    <h2>more than a match</h2>
+  </div>
+</section>
+
+<div class="what-sphere-video" aria-hidden="true">
+  <canvas class="what-sphere-canvas"></canvas>
+</div>
+
+<!-- ─── WHAT YOU GET: YOUR KINDRED ─── -->
+<section class="story-cut what-panel what-kindred" id="your-kindred">
+  <div class="container">
+    <div class="story-grid">
+      <div class="story-copy reveal">
+        <h2>your <span class="light">kindred.</span></h2>
+        <p>find the one person who feels unusually right, selected from the night instead of searched from a crowd.</p>
+      </div>
+      <div class="story-visual what-sphere-slot reveal d1" aria-hidden="true"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── WHAT YOU GET: CHEMISTRY ANALYSIS ─── -->
+<section class="story-cut what-panel what-chemistry reverse" id="chemistry-analysis">
+  <div class="container">
+    <div class="story-grid">
+      <div class="story-copy reveal">
+        <h2>chemistry <span class="light">analysis.</span></h2>
+        <p>see everyone you talked to at a glance, then open one person to understand what the conversation was like.</p>
+      </div>
+      <div class="story-visual what-sphere-slot reveal d1" aria-hidden="true"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── WHAT YOU GET: SELF JOURNALING ─── -->
+<section class="story-cut what-panel what-journal" id="self-journaling">
+  <div class="container">
+    <div class="story-grid">
+      <div class="story-copy reveal">
+        <h2>self <span class="light">journaling.</span></h2>
+        <p>as conversations stack up, nine starts to show you your own patterns: what opens you up, what repeats, and who brings you alive.</p>
+      </div>
+      <div class="story-visual what-sphere-slot reveal d1" aria-hidden="true"></div>
+    </div>
+  </div>
+</section>
+
+<section class="sphere-transition sphere-departure" id="sphere-departure" aria-hidden="true"></section>
+
+<!-- ─── HOW NINE WORKS: INTRO ─── -->
+<section class="sphere-transition sphere-approach" id="how-intro">
+  <div class="what-intro-copy">
+    <div class="story-kicker">how about nine works</div>
+    <h2>three rounds of checking <span class="light">how well you click.</span></h2>
+  </div>
+</section>
+
+<!-- ─── HOW NINE WORKS ─── -->
+<section class="how-nine" id="how">
+  <div class="container">
+    <div class="how-nine-inner reveal">
+      <div class="how-work-shell" data-how-carousel="">
+        <div class="how-work-layout">
+          <div class="how-phone-stage">
+            <button class="how-phone-nav prev" type="button" data-how-prev="" aria-label="previous step" title="previous step">←</button>
+            <div class="phone how-work-phone">
+              <div class="how-phone-screens">
+                <div class="how-phone-screen active" data-how-slide="" aria-hidden="false">
+                  <div class="proto-lounge">
+                    <div class="proto-brand">about nine</div>
+                    <div class="proto-tabs" aria-hidden="true">
+                      <span>lounge</span>
+                      <span class="active">ai match</span>
+                    </div>
+                    <div class="proto-content">
+                      <div class="proto-subtitle">our recommended matches</div>
+                      <div class="proto-user-list">
+                        <div class="proto-user-row">
+                          <div class="proto-user-card">
+                            <div>
+                              <div class="proto-user-name">mira cho <span class="proto-status"></span></div>
+                              <div class="proto-track" style="--ticker-dur:22s"><div class="proto-track-inner"><span>♩ cigarettes after sex — apocalypse</span><span aria-hidden="true">♩ cigarettes after sex — apocalypse</span></div></div>
+                            </div>
+                          </div>
+                          <button class="proto-start" type="button">start talk</button>
+                        </div>
+                        <div class="proto-user-row">
+                          <div class="proto-user-card">
+                            <div>
+                              <div class="proto-user-name">june park <span class="proto-status"></span></div>
+                              <div class="proto-track" style="--ticker-dur:26s"><div class="proto-track-inner"><span>♩ faye webster — right side of my neck</span><span aria-hidden="true">♩ faye webster — right side of my neck</span></div></div>
+                            </div>
+                          </div>
+                          <button class="proto-start" type="button">start talk</button>
+                        </div>
+                        <div class="proto-user-row">
+                          <div class="proto-user-card">
+                            <div>
+                              <div class="proto-user-name">noah kim <span class="proto-status"></span></div>
+                              <div class="proto-track" style="--ticker-dur:19s"><div class="proto-track-inner"><span>♩ men i trust — show me how</span><span aria-hidden="true">♩ men i trust — show me how</span></div></div>
+                            </div>
+                          </div>
+                          <button class="proto-start" type="button">start talk</button>
+                        </div>
+                        <div class="proto-user-row">
+                          <div class="proto-user-card">
+                            <div>
+                              <div class="proto-user-name">lea han <span class="proto-status"></span></div>
+                              <div class="proto-track" style="--ticker-dur:24s"><div class="proto-track-inner"><span>♩ laufey — from the start</span><span aria-hidden="true">♩ laufey — from the start</span></div></div>
+                            </div>
+                          </div>
+                          <button class="proto-start" type="button">start talk</button>
+                        </div>
+                        <div class="proto-user-row">
+                          <div class="proto-user-card">
+                            <div>
+                              <div class="proto-user-name">ren choi <span class="proto-status"></span></div>
+                              <div class="proto-track" style="--ticker-dur:20s"><div class="proto-track-inner"><span>♩ wave to earth — seasons</span><span aria-hidden="true">♩ wave to earth — seasons</span></div></div>
+                            </div>
+                          </div>
+                          <button class="proto-start" type="button">start talk</button>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="proto-bottom-nav"></div>
+                  </div>
+                </div>
+
+                <div class="how-phone-screen" data-how-slide="" aria-hidden="true">
+                  <div class="proto-option">
+                    <div class="proto-brand">about nine</div>
+                    <div class="proto-option-head">
+                      <div class="proto-topic">food</div>
+                      <div class="proto-question">which would you pick<br>for a late dinner?</div>
+                    </div>
+                    <div class="proto-carousel-wrap">
+                      <div class="proto-dots" aria-hidden="true"><i class="active"></i><i></i><i></i></div>
+                      <div class="proto-carousel">
+                        <div class="proto-food-card center">
+                          <img src="./images/food/pizza/hawaiian-pizza.png" alt="hawaiian pizza">
+                          <span>hawaiian</span>
+                        </div>
+                        <div class="proto-food-card">
+                          <img src="./images/food/pizza/margherita-pizza.png" alt="margherita pizza">
+                          <span>margherita</span>
+                        </div>
+                        <div class="proto-food-card">
+                          <img src="./images/food/pizza/funghi-pizza.png" alt="funghi pizza">
+                          <span>funghi</span>
+                        </div>
+                      </div>
+                    </div>
+                    <button class="proto-enter" type="button">enter</button>
+                  </div>
+                </div>
+
+                <div class="how-phone-screen" data-how-slide="" aria-hidden="true">
+                  <div class="proto-result">
+                    <div class="proto-brand">about nine</div>
+                    <div class="proto-chat">
+                      <div class="proto-row">
+                        <div class="proto-avatar"></div>
+                        <div class="proto-bubble">
+                          <div class="proto-speaker">coco</div>
+                          hi, i'm coco. i'll share what i notice between you two.
+                        </div>
+                      </div>
+                      <div class="proto-row">
+                        <div class="proto-avatar"></div>
+                        <div class="proto-bubble" style="padding: 0; background: transparent; border: none;">
+                          <div class="proto-score-card">
+                            <div class="proto-score-value">score: 94</div>
+                            <div class="proto-score-desc">warmth and curiosity both stayed high.</div>
+                            <button class="proto-score-btn" type="button">view score</button>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="proto-row">
+                        <div class="proto-avatar"></div>
+                        <div class="proto-bubble">
+                          <div class="proto-speaker">coco</div>
+                          go or no?
+                        </div>
+                      </div>
+                      <div class="proto-row mine">
+                        <div class="proto-bubble mine">go</div>
+                      </div>
+                      <div class="proto-row">
+                        <div class="proto-avatar"></div>
+                        <div class="proto-bubble">
+                          <div class="proto-speaker">coco</div>
+                          mira said go too.
+                        </div>
+                      </div>
+                      <div class="proto-row">
+                        <div class="proto-avatar"></div>
+                        <div class="proto-bubble">
+                          <div class="proto-speaker">coco</div>
+                          alright, this is the profile.
+                        </div>
+                      </div>
+                      <div class="proto-row">
+                        <div class="proto-avatar"></div>
+                        <div class="proto-bubble" style="padding: 0; background: transparent; border: none;">
+                          <div class="proto-profile-card">
+                            <div class="proto-profile-name">mira cho</div>
+                            <div class="proto-profile-meta">25 · trans woman<br>cigarettes after sex, wave to earth</div>
+                            <button class="proto-profile-btn" type="button">view profile</button>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="proto-row">
+                        <div class="proto-avatar"></div>
+                        <div class="proto-bubble">
+                          <div class="proto-speaker">coco</div>
+                          wishing you luck.
+                        </div>
+                      </div>
+                    </div>
+                    <div class="proto-input-area">
+                      <div class="proto-select">message coco</div>
+                      <div class="proto-send" aria-hidden="true"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <button class="how-phone-nav next" type="button" data-how-next="" aria-label="next step" title="next step">→</button>
+          </div>
+
+          <div class="how-copy-stack">
+            <div class="how-work-copy active" data-how-copy="" aria-hidden="false">
+              <h3>five, chosen for you</h3>
+              <p>at about nine, five people curated by ai. not a deck to swipe.</p>
+            </div>
+            <div class="how-work-copy" data-how-copy="" aria-hidden="true">
+              <h3>three voice rounds</h3>
+              <p>pick someone, then talk through three rounds: food, taste, and values.</p>
+            </div>
+            <div class="how-work-copy" data-how-copy="" aria-hidden="true">
+              <h3>a chemistry read</h3>
+              <p>a reading of how you connected, and how strong the chemistry was.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── FINAL CTA ─── -->
+<section class="final" id="cta">
+  <div class="container">
+    <h2 class="reveal" style="margin-top: 70px;">tonight, <span class="light">at nine.</span></h2>
+    <p class="reveal d1">about nine is in private beta in new york and los angeles.<br>join the waitlist and we will write when your night is ready.</p>
+    <form class="waitlist-form reveal d2" id="finalWaitlistForm" novalidate="">
+      <label class="waitlist-label" for="finalWaitlistEmail">email</label>
+      <div class="waitlist-row">
+        <input class="waitlist-input" id="finalWaitlistEmail" name="email" type="email" inputmode="email" autocomplete="email" placeholder="enter your email" aria-describedby="finalWaitlistMessage">
+        <button class="waitlist-submit" id="finalWaitlistButton" type="submit">join</button>
+      </div>
+      <div class="waitlist-message" id="finalWaitlistMessage" role="status" aria-live="polite"></div>
+    </form>
+  </div>
+</section>
+
+<div class="waitlist-modal" id="waitlistSuccessModal" aria-hidden="true">
+  <div class="waitlist-modal-content" role="dialog" aria-modal="true" aria-label="waitlist confirmation">
+    <svg class="waitlist-modal-icon" xmlns="http://www.w3.org/2000/svg" width="84" height="84" viewBox="0 0 84 84" fill="none">
+      <g filter="url(#waitlistGlow)">
+        <circle cx="42" cy="42" r="33" fill="url(#waitlistGlowGradient)"></circle>
+      </g>
+      <defs>
+        <filter id="waitlistGlow" x="0.6" y="0.6" width="82.8" height="82.8" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+          <feFlood flood-opacity="0" result="BackgroundImageFix"></feFlood>
+          <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"></feBlend>
+          <feGaussianBlur stdDeviation="2.95" result="effect1_foregroundBlur"></feGaussianBlur>
+        </filter>
+        <linearGradient id="waitlistGlowGradient" x1="9" y1="4.5" x2="75" y2="91.5" gradientUnits="userSpaceOnUse">
+          <stop stop-color="#d13588"></stop>
+          <stop offset="1" stop-color="#5e60c9"></stop>
+        </linearGradient>
+      </defs>
+    </svg>
+    <p>we'll let you know<br>when our app is ready</p>
+  </div>
+</div>
+
+<!-- ─── FOOTER ─── -->
+<footer>
+  <div class="row footer-row">
+    <div class="footer-copy">© 2025 Dalbit Arae Eoheung. all rights reserved.</div>
+    <div class="footer-meta">
+      <span>contact: <a href="mailto:support@aboutnine.ai">support@aboutnine.ai</a></span>
+      <a href="./privacy.html">privacy</a>
+      <a href="./terms.html">terms</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Scroll reveal via IntersectionObserver
+  (function(){
+    const reveal = (el) => el.classList.add('in');
+    if (!('IntersectionObserver' in window)) {
+      document.querySelectorAll('.reveal').forEach(reveal);
+      return;
+    }
+    const io = new IntersectionObserver((entries, obs) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          reveal(entry.target);
+          obs.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
+    document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+  })();
+</script>
+
+<script src="./interactive.js"></script>
+
+
+
+</body></html>
