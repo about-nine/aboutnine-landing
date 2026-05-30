@@ -78,6 +78,11 @@
     rotationY: 0,
     rotationZ: 0.05,
     cameraZ: 4.8,
+    dotProgress: 0,
+    chemProgress: 0,
+    centerGlow: 0,
+    orbitGlow: 0,
+    journalProgress: 0,
   };
   let whatSphereTarget = { ...whatSphereDefault };
   let whatSphereCurrent = { ...whatSphereDefault };
@@ -547,7 +552,102 @@
       group.add(ring);
     });
 
-    return { group, rings };
+    const centerDot = new THREE.Mesh(
+      new THREE.SphereGeometry(0.195, 24, 24),
+      new THREE.MeshStandardMaterial({
+        color: 0xcc4477, emissive: 0xff9bdc, emissiveIntensity: 0.5,
+        roughness: 0.3, metalness: 0, transparent: true, opacity: 0, depthWrite: false,
+      }),
+    );
+    group.add(centerDot);
+
+    const ringPoint = (rX, rY, rot, theta) => {
+      const p = new THREE.Vector3(Math.cos(theta) * rX, Math.sin(theta) * rY, 0);
+      p.applyEuler(new THREE.Euler(rot.x, rot.y, rot.z));
+      return p;
+    };
+
+    const placeDot = (mesh, pos) => {
+      mesh.position.copy(pos);
+      mesh.userData.to = pos.toArray();
+      mesh.userData.from = pos.clone().multiplyScalar(2.5).toArray();
+      group.add(mesh);
+    };
+
+    const orbitPos = ringPoint(1.72, 0.54, { x: 0.1, y: 0.34, z: -0.08 }, 0.8);
+    const orbitDot = new THREE.Mesh(
+      new THREE.SphereGeometry(0.15, 24, 24),
+      new THREE.MeshStandardMaterial({
+        color: 0x4833aa, emissive: 0x8b78ff, emissiveIntensity: 0.5,
+        roughness: 0.3, metalness: 0, transparent: true, opacity: 0, depthWrite: false,
+      }),
+    );
+    placeDot(orbitDot, orbitPos);
+
+    const STAR_PLACEMENTS = [
+      ringPoint(1.72, 0.54, { x: 0.1,   y: 0.34,  z: -0.08 }, Math.PI),
+      ringPoint(1.58, 0.46, { x: 0.94,  y: -0.16, z: 0.72  }, 0.4),
+      ringPoint(1.64, 0.50, { x: -0.64, y: 0.68,  z: -0.5  }, 2.6),
+      ringPoint(1.40, 0.40, { x: 1.36,  y: 0.20,  z: -0.92 }, 1.8),
+      ringPoint(1.84, 0.60, { x: -0.22, y: -0.72, z: 0.36  }, 5.0),
+    ];
+    const whiteDots = STAR_PLACEMENTS.map((pos) => {
+      const dot = new THREE.Mesh(
+        new THREE.SphereGeometry(0.07, 24, 24),
+        new THREE.MeshStandardMaterial({
+          color: 0xd0c8ff, emissive: 0xffffff, emissiveIntensity: 0.2,
+          roughness: 0.4, metalness: 0, transparent: true, opacity: 0, depthWrite: false,
+        }),
+      );
+      placeDot(dot, pos);
+      return dot;
+    });
+
+    const makeGlowMaterial = (colorHex) => new THREE.ShaderMaterial({
+      uniforms: {
+        uColor: { value: new THREE.Color(colorHex) },
+        uOpacity: { value: 0 },
+      },
+      vertexShader: `
+        varying vec3 vNormal;
+        varying vec3 vViewDir;
+        void main() {
+          vNormal = normalize(normalMatrix * normal);
+          vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+          vViewDir = normalize(-mvPos.xyz);
+          gl_Position = projectionMatrix * mvPos;
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 uColor;
+        uniform float uOpacity;
+        varying vec3 vNormal;
+        varying vec3 vViewDir;
+        void main() {
+          float rim = 1.0 - max(dot(vNormal, vViewDir), 0.0);
+          float alpha = uOpacity * pow(rim, 1.6);
+          gl_FragColor = vec4(uColor, alpha);
+        }
+      `,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.FrontSide,
+      blending: THREE.AdditiveBlending,
+    });
+
+    const centerGlowMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(0.24, 24, 24),
+      makeGlowMaterial(0xff9bdc),
+    );
+    centerDot.add(centerGlowMesh);
+
+    const orbitGlowMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(0.19, 24, 24),
+      makeGlowMaterial(0x8b78ff),
+    );
+    orbitDot.add(orbitGlowMesh);
+
+    return { group, rings, centerDot, orbitDot, whiteDots, centerGlowMesh, orbitGlowMesh };
   }
 
   function resizeWhatSphere3D() {
@@ -603,6 +703,60 @@
     );
     whatSphere3D.group.scale.setScalar(objectScale);
     whatSphere3D.camera.position.z = cameraZ;
+
+    if (whatSphere3D.centerDot && whatSphere3D.orbitDot) {
+      const dp = whatSphereCurrent.dotProgress;
+
+      const centerEased = smoothstep(clamp(dp / 0.7));
+      whatSphere3D.centerDot.material.opacity = centerEased;
+      whatSphere3D.centerDot.scale.setScalar(centerEased);
+      whatSphere3D.centerDot.position.set(
+        lerp(0.3, 0, centerEased),
+        lerp(0.6, 0, centerEased),
+        lerp(0.8, 0, centerEased),
+      );
+
+      const orbitEased = smoothstep(clamp((dp - 0.2) / 0.8));
+      whatSphere3D.orbitDot.material.opacity = orbitEased;
+      whatSphere3D.orbitDot.scale.setScalar(orbitEased);
+      const { from: oFrom, to: oTo } = whatSphere3D.orbitDot.userData;
+      const chemP = whatSphereCurrent.chemProgress;
+      const CHEM_OVERLAP = [0.0, -0.24, 0.05];
+      whatSphere3D.orbitDot.position.set(
+        lerp(lerp(oFrom[0], oTo[0], orbitEased), CHEM_OVERLAP[0], chemP),
+        lerp(lerp(oFrom[1], oTo[1], orbitEased), CHEM_OVERLAP[1], chemP),
+        lerp(lerp(oFrom[2], oTo[2], orbitEased), CHEM_OVERLAP[2], chemP),
+      );
+
+      if (whatSphere3D.chemOverlay) {
+        whatSphere3D.chemOverlay.style.opacity = chemP;
+      }
+
+      if (whatSphere3D.centerGlowMesh) {
+        whatSphere3D.centerGlowMesh.material.uniforms.uOpacity.value = whatSphereCurrent.centerGlow;
+      }
+      if (whatSphere3D.orbitGlowMesh) {
+        whatSphere3D.orbitGlowMesh.material.uniforms.uOpacity.value = whatSphereCurrent.orbitGlow;
+      }
+
+      if (whatSphere3D.journalOverlay) {
+        whatSphere3D.journalOverlay.style.opacity = whatSphereCurrent.journalProgress;
+      }
+
+      const STAR_STAGGER = [0.0, 0.08, 0.04, 0.12, 0.06];
+      whatSphere3D.whiteDots?.forEach((dot, i) => {
+        const { from, to } = dot.userData;
+        const t = smoothstep(clamp((dp - STAR_STAGGER[i]) / 0.7));
+        dot.material.opacity = t * 0.85;
+        dot.scale.setScalar(t);
+        dot.position.set(
+          lerp(from[0], to[0], t),
+          lerp(from[1], to[1], t),
+          lerp(from[2], to[2], t),
+        );
+      });
+    }
+
     whatSphere3D.renderer.render(whatSphere3D.scene, whatSphere3D.camera);
   }
 
@@ -644,7 +798,7 @@
 
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
-      const { group, rings } = buildOrbitSphere(THREE);
+      const { group, rings, centerDot, orbitDot, whiteDots, centerGlowMesh, orbitGlowMesh } = buildOrbitSphere(THREE);
 
       scene.add(new THREE.AmbientLight(0xffffff, 1.25));
       const keyLight = new THREE.PointLight(0xff9bdc, 2.35, 7);
@@ -662,10 +816,39 @@
         camera,
         group,
         rings,
+        centerDot,
+        orbitDot,
+        whiteDots,
+        centerGlowMesh,
+        orbitGlowMesh,
         focusVector: new THREE.Vector3(),
         width: 0,
         height: 0,
       };
+
+      const chemOverlay = document.createElement('div');
+      chemOverlay.className = 'chem-text-overlay';
+      chemOverlay.textContent = 'your synergy is rare. like two complementary elements, your resonance creates a stable orbit.';
+      whatSphere.appendChild(chemOverlay);
+      whatSphere3D.chemOverlay = chemOverlay;
+
+      const journalOverlay = document.createElement('div');
+      journalOverlay.className = 'journal-text-overlay';
+      const journalWords = [
+        { text: 'to eat',    dx: -65,  dy: -44,  size: 12 },
+        { text: 'to listen', dx:  56,  dy:  12,  size: 13.5 },
+        { text: 'to see',    dx: -46,  dy:  54,  size: 11.5 },
+        { text: 'matters',   dx:  48,  dy: -54,  size: 13 },
+      ];
+      journalWords.forEach(({ text, dx, dy, size }) => {
+        const el = document.createElement('span');
+        el.className = 'journal-word';
+        el.textContent = text;
+        el.style.cssText = `left:calc(var(--what-left) + ${dx}px);top:calc(var(--what-top) + ${dy}px);font-size:${size}px`;
+        journalOverlay.appendChild(el);
+      });
+      whatSphere.appendChild(journalOverlay);
+      whatSphere3D.journalOverlay = journalOverlay;
 
       resizeWhatSphere3D();
       renderWhatSphere3D();
@@ -702,9 +885,11 @@
     const sphereProgress = Math.min(heldProgress, pJournal);
     const journalScrollLift = (Math.max(0, heldScrollTop - whatSections[2].offsetTop) / vh) * 100;
     const approachTop = viewportTopFor(sphereApproach, 0.5);
+    const approachTopAtTransition = sphereApproach.offsetHeight * 0.5 / vh * 100;
     const introEnd = Math.max(0.0001, pApproach * 0.8);
+    const preSectionFade = clamp((scrollTop - (start - vh * 0.6)) / (vh * 0.6));
     const sphereOpacity = interpolateStops(progress, [
-      [0, scrollTop < start - vh * 0.4 ? 0 : 0.18],
+      [0, preSectionFade * 0.18],
       [introEnd * 0.45, 0.48],
       [introEnd, 1],
       [1, 1],
@@ -721,8 +906,8 @@
     const baseTop = progress <= pApproach
       ? approachTop
       : (compact
-        ? interpolateStops(sphereProgress, [[pApproach, 50], [pKindred, 70], [pChemistry, 74], [pJournalBreath, 72], [pJournal, 68], [1, 68]])
-        : interpolateStops(sphereProgress, [[pApproach, 50], [pKindred, 51], [pChemistry, 50], [pJournalBreath, 54], [pJournal, 52], [1, 52]]));
+        ? interpolateStops(sphereProgress, [[pApproach, approachTopAtTransition], [pKindred, 70], [pChemistry, 74], [pJournalBreath, 72], [pJournal, 68], [1, 68]])
+        : interpolateStops(sphereProgress, [[pApproach, approachTopAtTransition], [pKindred, 51], [pChemistry, 50], [pJournalBreath, 54], [pJournal, 52], [1, 52]]));
     const top = baseTop - journalScrollLift;
     const scale = compact
       ? interpolateStops(sphereProgress, [[0, 1.12], [pApproach, 1.12], [pKindred, 0.9], [pChemistry, 1.02], [pJournalBreath, 0.72], [pJournal, 1.02], [1, 1.02]])
@@ -738,6 +923,25 @@
       ? interpolateStops(sphereProgress, [[0, 4.92], [pApproach, 4.92], [pKindred, 5.7], [pChemistry, 5.3], [pJournalBreath, 6.4], [pJournal, 5.3], [1, 5.3]])
       : interpolateStops(sphereProgress, [[0, 4.84], [pApproach, 4.84], [pKindred, 5.42], [pChemistry, 5], [pJournalBreath, 6.2], [pJournal, 5], [1, 5]]);
 
+    const dotAnimStart = lerp(pApproach, pKindred, 0.35);
+    const dotProgress = clamp((sphereProgress - dotAnimStart) / Math.max(0.0001, pKindred - dotAnimStart));
+
+    // kindred: orbit(보라)만 글로우
+    const kindredGlowIn = clamp((sphereProgress - lerp(pApproach, pKindred, 0.4)) / Math.max(0.0001, pKindred - lerp(pApproach, pKindred, 0.4)));
+    const kindredGlowOut = 1 - clamp((sphereProgress - lerp(pKindred, pChemistry, 0.1)) / Math.max(0.0001, lerp(pKindred, pChemistry, 0.3) - lerp(pKindred, pChemistry, 0.1)));
+    const kindredOrbitGlow = smoothstep(clamp(Math.min(kindredGlowIn, kindredGlowOut)));
+
+    // journal: center(분홍)만 글로우
+    const journalGlowIn = clamp((sphereProgress - lerp(pChemistry, pJournal, 0.5)) / Math.max(0.0001, pJournal - lerp(pChemistry, pJournal, 0.5)));
+    const journalCenterGlow = smoothstep(clamp(journalGlowIn));
+
+    const chemInStart = lerp(pKindred, pChemistry, 0.35);
+    const chemOutStart = lerp(pChemistry, pJournal, 0.15);
+    const chemOutEnd = lerp(pChemistry, pJournal, 0.55);
+    const chemIn = clamp((sphereProgress - chemInStart) / Math.max(0.0001, pChemistry - chemInStart));
+    const chemOut = 1 - clamp((sphereProgress - chemOutStart) / Math.max(0.0001, chemOutEnd - chemOutStart));
+    const chemProgress = smoothstep(clamp(Math.min(chemIn, chemOut)));
+
     setWhatSphere3DTarget({
       opacity: sphereOpacity,
       left,
@@ -752,6 +956,11 @@
       rotationY,
       rotationZ,
       cameraZ,
+      dotProgress,
+      chemProgress,
+      centerGlow: Math.max(chemProgress, journalCenterGlow),
+      orbitGlow: Math.max(kindredOrbitGlow, chemProgress),
+      journalProgress: journalCenterGlow,
     });
   }
 

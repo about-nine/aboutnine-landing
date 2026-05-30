@@ -1271,6 +1271,39 @@
     .proto-result .proto-row { opacity: 1; transform: none; }
     .proto-result .proto-row.proto-msg-in { animation: none; }
   }
+  .journal-text-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+  }
+  .journal-word {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    color: var(--aurora-paper-dim);
+    font-family: inherit;
+    white-space: nowrap;
+  }
+  .chem-text-overlay {
+    position: absolute;
+    left: max(80px, calc((100vw - 1280px) / 2 + 80px));
+    top: calc(var(--what-top, 50%) + 80px);
+    transform: translateY(-50%);
+    pointer-events: none;
+    opacity: 0;
+    text-align: left;
+    font-family: inherit;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--aurora-paper-dim);
+    max-width: 220px;
+  }
+  @media (max-width: 960px) {
+    .chem-text-overlay { top: calc(var(--what-top, 50%) + 100px); }
+  }
+  @media (max-width: 420px) {
+    .chem-text-overlay { left: 24px; }
+  }
 </style>
 <link rel="stylesheet" href="./interactive.css">
 </head>
@@ -1410,18 +1443,18 @@
   </div>
 
   <div class="container">
-    <blockquote class="quote">
+    <blockquote class="quote reveal">
       a thousand voices in the dark.<br>
       <span class="light">one of them, <em class="kindred">kindred</em>.</span>
     </blockquote>
-    <p class="dark-room-sub">we hope you find one and stay there.</p>
+    <p class="dark-room-sub reveal d1">we hope you find one and stay there.</p>
   </div>
 </section>
 
 <section class="sphere-transition sphere-approach" id="sphere-approach">
   <div class="what-intro-copy">
-    <div class="story-kicker">what you get</div>
-    <h2>more than a match</h2>
+    <div class="story-kicker reveal">what you get</div>
+    <h2 class="reveal d1"><span class="light">more</span> than a match</h2>
   </div>
 </section>
 
@@ -1434,8 +1467,8 @@
   <div class="container">
     <div class="story-grid">
       <div class="story-copy reveal">
-        <h2>your <span class="light">kindred.</span></h2>
-        <p>find the one person who feels unusually right, selected from the night instead of searched from a crowd.</p>
+        <h2>your kindred</h2>
+        <p>no swiping, no endless decks. night after night, coco learns who you are and brings you closer to the one who truly fits.</p>
       </div>
       <div class="story-visual what-sphere-slot reveal d1" aria-hidden="true"></div>
     </div>
@@ -1447,8 +1480,8 @@
   <div class="container">
     <div class="story-grid">
       <div class="story-copy reveal">
-        <h2>chemistry <span class="light">analysis.</span></h2>
-        <p>see everyone you talked to at a glance, then open one person to understand what the conversation was like.</p>
+        <h2>chemistry analysis</h2>
+        <p>after the call, coco maps the two of you and breaks down exactly how your worlds meet.</p>
       </div>
       <div class="story-visual what-sphere-slot reveal d1" aria-hidden="true"></div>
     </div>
@@ -1460,8 +1493,8 @@
   <div class="container">
     <div class="story-grid">
       <div class="story-copy reveal">
-        <h2>self <span class="light">journaling.</span></h2>
-        <p>as conversations stack up, nine starts to show you your own patterns: what opens you up, what repeats, and who brings you alive.</p>
+        <h2>self journaling</h2>
+        <p>every conversation reveals a little more of you. explore what you love, bubble by bubble.</p>
       </div>
       <div class="story-visual what-sphere-slot reveal d1" aria-hidden="true"></div>
     </div>
@@ -1473,8 +1506,8 @@
 <!-- ─── HOW NINE WORKS: INTRO ─── -->
 <section class="sphere-transition sphere-approach" id="how-intro">
   <div class="what-intro-copy">
-    <div class="story-kicker">how about nine works</div>
-    <h2>three rounds of checking <span class="light">how well you click.</span></h2>
+    <div class="story-kicker reveal">how about nine works</div>
+    <h2 class="reveal d1">three rounds of checking <span class="light">how well you click.</span></h2>
   </div>
 </section>
 
