@@ -414,6 +414,9 @@
     position: relative;
     min-height: clamp(610px, 72vh, 760px);
   }
+  .how-mobile {
+    display: none;
+  }
   .how-work-layout {
     display: grid;
     grid-template-columns: minmax(240px, 390px) minmax(0, 1fr);
@@ -784,7 +787,8 @@
     gap: 8px;
     min-height: 0;
     padding-top: 4px;
-    overflow-y: auto;
+    overflow: hidden;
+    overscroll-behavior: none;
     scrollbar-width: none;
   }
   .proto-chat::-webkit-scrollbar { display: none; }
@@ -1073,7 +1077,7 @@
       padding-bottom: 72px !important;
     }
     .how-nine--mobile .how-work-shell { display: none; }
-    .how-mobile { display: flex; flex-direction: column; }
+    .how-nine--mobile .how-mobile { display: flex; flex-direction: column; }
     .how-mobile-item { margin-bottom: 72px; }
     .how-mobile-item:last-child { margin-bottom: 0; }
     .how-mobile-copy { margin-bottom: 28px; }

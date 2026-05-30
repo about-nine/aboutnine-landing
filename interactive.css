@@ -221,13 +221,28 @@ footer a:hover,
   --hero-pad-x: clamp(32px, 7.5vw, 140px);
   --hero-gap: clamp(30px, 4.6vw, 76px);
   --hero-phone-width: min(380px, 24vw, 38vh);
-  --hero-score-scroll: min(760px, 78svh);
+  --hero-score-scroll: min(1180px, 128svh);
   display: block;
   overflow: visible;
   min-height: calc(100svh + var(--hero-score-scroll));
   height: calc(100svh + var(--hero-score-scroll));
   padding: 0;
   background: transparent;
+}
+
+.dark-room {
+  min-height: 120svh;
+  height: 120svh;
+}
+
+.sphere-transition:not(.sphere-departure) {
+  min-height: 116svh;
+  height: 116svh;
+}
+
+.story-cut.what-panel {
+  min-height: 128svh;
+  height: 128svh;
 }
 
 .hero::before {
@@ -673,10 +688,25 @@ footer {
   .hero {
     --hero-pad-x: 32px;
     --hero-phone-width: min(100%, 320px);
-    --hero-score-scroll: min(680px, 82svh);
+    --hero-score-scroll: min(980px, 112svh);
     height: calc(100svh + var(--hero-score-scroll));
     min-height: calc(100svh + var(--hero-score-scroll));
     overflow: visible;
+  }
+
+  .dark-room {
+    min-height: 112svh;
+    height: 112svh;
+  }
+
+  .sphere-transition:not(.sphere-departure) {
+    min-height: 108svh;
+    height: 108svh;
+  }
+
+  .story-cut.what-panel {
+    min-height: 116svh;
+    height: 116svh;
   }
 
   .hero .grid {
@@ -874,4 +904,36 @@ footer {
     transition: none !important;
   }
 
+}
+
+:root {
+  --display-heading-size: clamp(56px, 6.7vw, 96px);
+}
+
+.hero h1,
+.dark-room .quote,
+.story-copy h2,
+.what-intro-copy h2,
+.how-work-copy h3,
+.how-mobile-copy h3,
+.final h2 {
+  font-size: var(--display-heading-size);
+}
+
+@media (max-width: 960px) {
+  :root {
+    --display-heading-size: 56px;
+  }
+}
+
+@media (max-width: 420px) {
+  :root {
+    --display-heading-size: 38px;
+  }
+}
+
+@media (max-width: 360px) {
+  :root {
+    --display-heading-size: 32px;
+  }
 }

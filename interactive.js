@@ -3,6 +3,7 @@
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const clamp = (value, min = 0, max = 1) => Math.min(max, Math.max(min, value));
   const lerp = (a, b, t) => a + (b - a) * t;
+  const smoothstep = (value) => value * value * (3 - 2 * value);
 
   const darkRoom = document.querySelector('.dark-room');
   const sphereApproach = document.querySelector('.sphere-approach');
@@ -31,6 +32,8 @@
   let latestProgress = 0;
   let rafPending = false;
   let activeHowSlide = 0;
+  let howMobileEl = null;
+  let howCarouselIsBound = false;
   let whatSphere3D = null;
   let whatSphereRenderRaf = null;
 
@@ -55,6 +58,11 @@
       max: Infinity,
       lines: ['Perfect match.', 'Don’t overthink it.', 'Keep the talk going.'],
     },
+  ];
+  const HERO_PROGRESS_HOLDS = [
+    { at: 0.2, radius: 0.075, strength: 0.62 },
+    { at: 0.7, radius: 0.075, strength: 0.62 },
+    { at: 0.98, radius: 0.055, strength: 0.48 },
   ];
   const whatSphereDefault = {
     opacity: 0,
@@ -164,6 +172,19 @@
     return clamp((currentScrollTop - (hero?.offsetTop || 0)) / scoreRange);
   }
 
+  function applyProgressHolds(progress, holds) {
+    if (reduceMotion) return progress;
+
+    return clamp(holds.reduce((heldProgress, hold) => {
+      const distance = Math.abs(progress - hold.at);
+      if (distance >= hold.radius) return heldProgress;
+
+      const proximity = 1 - distance / hold.radius;
+      const holdAmount = smoothstep(proximity) * hold.strength;
+      return lerp(heldProgress, hold.at, holdAmount);
+    }, progress));
+  }
+
   function updateAuroraProgress(progress) {
     const eased = progress * progress * (3 - 2 * progress);
     const cursorMax = window.innerWidth <= 960 ? 0.38 : 0.74;
@@ -173,7 +194,8 @@
   }
 
   function updateHeroScoreVisual(scrollTop = null) {
-    const progress = getHeroScoreProgress(scrollTop);
+    const rawProgress = getHeroScoreProgress(scrollTop);
+    const progress = applyProgressHolds(rawProgress, HERO_PROGRESS_HOLDS);
     updateAuroraProgress(progress);
 
     if (!heroScoreValue || !heroScoreCaption) return;
@@ -183,8 +205,8 @@
 
     const score = 50 + progress * 50;
 
-    setOdometer(Math.round(score), progress === 0 || reduceMotion);
-    setHeroScoreCaption(captionForScore(score), progress === 0 || reduceMotion);
+    setOdometer(Math.round(score), rawProgress === 0 || reduceMotion);
+    setHeroScoreCaption(captionForScore(score), rawProgress === 0 || reduceMotion);
   }
 
   function showWaitlistMessage(text, type) {
@@ -314,6 +336,12 @@
     chatAnimTimers.forEach(clearTimeout);
     chatAnimTimers = [];
     if (chatEl) chatEl.scrollTop = 0;
+
+    const scrollChatTo = (top) => {
+      if (!chatEl) return;
+      chatEl.scrollTo({ top, behavior: 'smooth' });
+    };
+
     const delays = [80, 700, 1600, 2500, 3300, 4000, 4800, 5500];
     rows.forEach((row, i) => {
       const t = setTimeout(() => {
@@ -321,7 +349,7 @@
         if (chatEl) {
           const rowBottom = row.offsetTop - chatEl.offsetTop + row.offsetHeight;
           const visibleBottom = chatEl.scrollTop + chatEl.clientHeight;
-          if (rowBottom > visibleBottom) chatEl.scrollTop = rowBottom - chatEl.clientHeight + 8;
+          if (rowBottom > visibleBottom) scrollChatTo(rowBottom - chatEl.clientHeight + 8);
         }
       }, delays[i] ?? i * 700);
       chatAnimTimers.push(t);
@@ -348,9 +376,9 @@
 
   function setupHowMobile() {
     const howSection = document.querySelector('.how-nine');
-    if (!howSection) return;
+    if (!howSection || !howCarousel) return null;
 
-    howSection.classList.add('how-nine--mobile');
+    if (howMobileEl) return howMobileEl;
 
     const mobileEl = document.createElement('div');
     mobileEl.className = 'how-mobile';
@@ -386,10 +414,10 @@
     });
 
     howCarousel.after(mobileEl);
-
+    howMobileEl = mobileEl;
 
     if ('IntersectionObserver' in window) {
-      const observer = new IntersectionObserver((entries) => {
+      const mobileObserver = new IntersectionObserver((entries) => {
         entries.forEach((entry) => {
           if (!entry.isIntersecting) return;
           const index = parseInt(entry.target.dataset.howMobileIndex, 10);
@@ -400,31 +428,49 @@
         });
       }, { threshold: 0.25 });
 
-      mobileEl.querySelectorAll('.how-mobile-item').forEach((item) => observer.observe(item));
+      mobileEl.querySelectorAll('.how-mobile-item').forEach((item) => mobileObserver.observe(item));
     }
+
+    return howMobileEl;
+  }
+
+  function syncHowLayout(isMobile = window.matchMedia('(max-width: 960px)').matches) {
+    if (!howNine) return;
+    if (isMobile) setupHowMobile();
+    howNine.classList.toggle('how-nine--mobile', isMobile);
+    if (!isMobile) setHowSlide(activeHowSlide);
   }
 
   function setupHowCarousel() {
     if (!howCarousel || !howSlides.length) return;
 
-    if (window.matchMedia('(max-width: 960px)').matches) {
-      setupHowMobile();
-      return;
+    if (!howCarouselIsBound) {
+      howPrevButtons.forEach((button) => {
+        button.addEventListener('click', () => setHowSlide(activeHowSlide - 1));
+      });
+      howNextButtons.forEach((button) => {
+        button.addEventListener('click', () => setHowSlide(activeHowSlide + 1));
+      });
+
+      howCarousel.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowLeft') setHowSlide(activeHowSlide - 1);
+        if (event.key === 'ArrowRight') setHowSlide(activeHowSlide + 1);
+      });
+
+      howCarouselIsBound = true;
     }
 
-    howPrevButtons.forEach((button) => {
-      button.addEventListener('click', () => setHowSlide(activeHowSlide - 1));
-    });
-    howNextButtons.forEach((button) => {
-      button.addEventListener('click', () => setHowSlide(activeHowSlide + 1));
-    });
-
-    howCarousel.addEventListener('keydown', (event) => {
-      if (event.key === 'ArrowLeft') setHowSlide(activeHowSlide - 1);
-      if (event.key === 'ArrowRight') setHowSlide(activeHowSlide + 1);
-    });
-
-    setHowSlide(0);
+    const mobileQuery = window.matchMedia('(max-width: 960px)');
+    const handleHowLayoutChange = (event) => {
+      syncHowLayout(event.matches);
+      requestScrollUpdate();
+    };
+    if (mobileQuery.addEventListener) {
+      mobileQuery.addEventListener('change', handleHowLayoutChange);
+    } else {
+      mobileQuery.addListener(handleHowLayoutChange);
+    }
+    syncHowLayout(mobileQuery.matches);
   }
 
   function interpolateStops(progress, stops) {
@@ -647,8 +693,14 @@
     const pChemistry = at(whatSections[1]);
     const pJournal = at(whatSections[2]);
     const pJournalBreath = lerp(pChemistry, pJournal, 0.42);
-    const sphereProgress = Math.min(progress, pJournal);
-    const journalScrollLift = (Math.max(0, scrollTop - whatSections[2].offsetTop) / vh) * 100;
+    const heldProgress = applyProgressHolds(progress, [
+      { at: pKindred, radius: compact ? 0.065 : 0.052, strength: 0.72 },
+      { at: pChemistry, radius: compact ? 0.065 : 0.052, strength: 0.72 },
+      { at: pJournal, radius: compact ? 0.07 : 0.056, strength: 0.76 },
+    ]);
+    const heldScrollTop = start + heldProgress * Math.max(1, end - start);
+    const sphereProgress = Math.min(heldProgress, pJournal);
+    const journalScrollLift = (Math.max(0, heldScrollTop - whatSections[2].offsetTop) / vh) * 100;
     const approachTop = viewportTopFor(sphereApproach, 0.5);
     const introEnd = Math.max(0.0001, pApproach * 0.8);
     const sphereOpacity = interpolateStops(progress, [
