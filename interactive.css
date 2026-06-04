@@ -828,6 +828,7 @@ footer {
     --hero-pad-x: 32px;
     --hero-phone-width: min(100%, 320px);
     --hero-score-scroll: min(980px, 112svh);
+    --hero-clock-size: min(60vw, 224px);
     height: calc(100svh + var(--hero-score-scroll));
     min-height: calc(100svh + var(--hero-score-scroll));
     overflow: visible;
@@ -949,8 +950,8 @@ footer {
   }
 
   .hero .phone .sphere-stage {
-    width: 206px;
-    height: 206px;
+    width: var(--hero-clock-size);
+    height: var(--hero-clock-size);
   }
 
   .hero .phone .number {

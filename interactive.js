@@ -278,6 +278,9 @@
     isNightActive = h >= 21 || h < 2;
     prevNightActive = isNightActive; // no animation on initial load
     applyNightActiveState();
+    if (heroClockStartedActive && hero) {
+      hero.style.setProperty('--hero-score-scroll', '0px');
+    }
   }
 
   function updateAuroraProgress(progress) {
@@ -1013,17 +1016,39 @@
   function updateHeroClockVisual(scrollTop = null) {
     if (!heroClock) return;
 
+    // 9pm~2am 접속 유저: 이미 야간 모드이므로 hero 섹션에서 구체를 굴리지 않고 현재 시각 고정
+    if (heroClockStartedActive) {
+      isNightActive = true;
+      applyNightActiveState();
+      if (!darkRoomClockTransiting) {
+        const h = heroClockBaseTime.getHours();
+        const m = heroClockBaseTime.getMinutes();
+        const s = heroClockBaseTime.getSeconds();
+        const minuteAngle = ((m + s / 60) / 60) * 360;
+        const hourAngle = (((h % 12) + m / 60 + s / 3600) / 12) * 360;
+        heroClockState.progress = 0;
+        heroClockState.hourAngle = (hourAngle - 90) * (Math.PI / 180);
+        heroClockState.minuteAngle = (minuteAngle - 90) * (Math.PI / 180);
+        renderHeroClock3D();
+      }
+      const timeText = formatHeroClockTime(heroClockBaseTime);
+      if (heroTimeValue && heroLastTimeText !== timeText) {
+        heroTimeValue.textContent = timeText;
+        heroLastTimeText = timeText;
+      }
+      heroClock.setAttribute('aria-label', `current time ${timeText}`);
+      return;
+    }
+
     const rawProgress = getHeroScoreProgress(scrollTop);
-    const effectiveRawProgress = (!heroClockStartedActive && heroNightLockProgress !== null)
+    const effectiveRawProgress = (heroNightLockProgress !== null)
       ? Math.max(rawProgress, heroNightLockProgress)
       : rawProgress;
     const progress = reduceMotion ? 0 : applyProgressHolds(effectiveRawProgress, HERO_NIGHT_HOLDS);
     const minutesFromScroll = Math.round(progress * HERO_CLOCK_SCROLL_MINUTES);
     const displayTime = new Date(heroClockBaseTime.getTime() + minutesFromScroll * 60000);
-    if (!heroClockStartedActive && displayTime.getHours() >= 21) {
+    if (displayTime.getHours() >= 21) {
       displayTime.setHours(21, 0, 0, 0);
-    } else if (heroClockStartedActive && displayTime.getHours() >= 2 && displayTime.getHours() < 21) {
-      displayTime.setHours(2, 0, 0, 0);
     }
     const hours = displayTime.getHours();
     const minutes = displayTime.getMinutes();
@@ -1033,7 +1058,7 @@
     const timeText = formatHeroClockTime(displayTime);
 
     isNightActive = hours >= 21 || hours < 2;
-    if (isNightActive && !heroClockStartedActive && heroNightLockProgress === null) {
+    if (isNightActive && heroNightLockProgress === null) {
       heroNightLockProgress = rawProgress;
     }
     applyNightActiveState();
@@ -1552,7 +1577,7 @@
     const viewWidth = viewHeight * whatSphere3D.camera.aspect;
     const targetX = (whatSphereCurrent.left / 100 - 0.5) * viewWidth;
     const targetY = -(whatSphereCurrent.top / 100 - 0.5) * viewHeight;
-    const canvasScale = window.innerWidth <= 960 ? 0.52 : 0.58;
+    const canvasScale = window.innerWidth <= 960 ? 0.64 : 0.58;
     const panelScale = whatSphereCurrent.depth * whatSphereCurrent.scale * canvasScale;
     const spacerScale = (viewWidth * ORBIT_SPACER_WIDTH) / (ORBIT_FRAME_RADIUS_X * 2);
     const objectScale = lerp(panelScale, spacerScale, clamp(whatSphereCurrent.fitAmount));
@@ -1985,7 +2010,7 @@
     const rotationX = interpolateStops(sphereProgress, [[0, -0.1], [pApproach, -0.1], [pKindred, 0.04], [pChemistry, -0.04], [pJournal, 0.08], [1, 0.08]]);
     const rotationY = interpolateStops(sphereProgress, [[0, -0.34], [pApproach, -0.34], [pKindred, 0.54], [pChemistry, 1.38], [pJournalBreath, 1.62], [pJournal, 2.1], [1, 2.1]]);
     const rotationZ = progress <= pApproach ? 0.06 : 0.04;
-    const cameraZ = lerp(whatSphereDefault.cameraZ, compact ? 5.35 : 5.12, approachToKindred);
+    const cameraZ = lerp(whatSphereDefault.cameraZ, compact ? 5.05 : 5.12, approachToKindred);
 
     const dotAnimStart = lerp(pApproach, pKindred, 0.35);
     const dotProgress = clamp((sphereProgress - dotAnimStart) / Math.max(0.0001, pKindred - dotAnimStart));
