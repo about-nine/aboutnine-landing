@@ -1994,7 +1994,7 @@
     const sectionLeft = compact
       ? lerp(lerp(35, 43, kindredToChemistry), 50, chemistryToJournal)
       : lerp(lerp(65, 28, kindredToChemistry), 72, chemistryToJournal);
-    const sectionTop = compact ? 72 : 52;
+    const sectionTop = compact ? 62 : 52;
     const left = progress <= pApproach
       ? 50
       : lerp(50, sectionLeft, approachToKindred);
