@@ -11,7 +11,7 @@
   html {
     scroll-behavior: smooth;
     scroll-padding-top: 0;
-    overflow-x: clip;
+    overflow-x: hidden;
   }
   .hero,
   .dark-room,
@@ -33,10 +33,12 @@
     font-size: 17px;
     line-height: 1.7;
     text-transform: lowercase;
+    overflow-x: hidden;
     overflow-x: clip;
     min-height: 100vh;
     -webkit-font-smoothing: antialiased;
   }
+  .nobreak { display: inline-block; white-space: nowrap; }
 
   .container { max-width: 1280px; margin: 0 auto; padding: 0 80px; }
   section { padding: 120px 0; position: relative; }
@@ -57,6 +59,7 @@
   .topnav {
     position: fixed; top: 0; left: 0; right: 0; z-index: 50;
     padding: 22px 0;
+    -webkit-backdrop-filter: blur(14px);
     backdrop-filter: blur(14px);
     background: rgba(20,20,22,0.65);
     border-bottom: 1px solid rgba(255,255,255,0.06);
@@ -214,8 +217,8 @@
 
   /* starfield of tiny asterisks */
   .starfield {
-    position: absolute; inset: 0; pointer-events: none;
-    z-index: 0;
+    position: fixed; inset: 0; pointer-events: none;
+    z-index: 1;
     color: #fff;
   }
   .starfield svg { width: 100%; height: 100%; display: block; }
@@ -356,8 +359,10 @@
     pointer-events: none;
     opacity: var(--sphere-opacity);
     visibility: hidden;
-    transform: none;
+    transform: translate3d(0, 0, 0);
     transition: none;
+    contain: layout paint size;
+    backface-visibility: hidden;
     will-change: opacity;
   }
   .what-sphere-video.is-unavailable {
@@ -373,7 +378,7 @@
     position: relative;
     min-height: 100svh;
     height: auto;
-    padding: clamp(92px, 12vh, 124px) 0 clamp(72px, 10vh, 110px);
+    padding: 120px 0;
     overflow: hidden;
     isolation: isolate;
     background: transparent;
@@ -387,7 +392,7 @@
     width: 100%;
   }
   .how-nine-inner {
-    max-width: 1120px;
+    width: 100%;
     margin: 0 auto;
   }
   .how-nine-header {
@@ -413,9 +418,54 @@
   .how-work-shell {
     position: relative;
     min-height: clamp(610px, 72vh, 760px);
+    display: none;
   }
   .how-mobile {
-    display: none;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(96px, 14vh, 150px);
+  }
+  .how-mobile-item {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(280px, 390px);
+    gap: clamp(48px, 8vw, 112px);
+    align-items: center;
+    min-height: min(760px, 82svh);
+  }
+  .how-mobile-item:nth-child(even) {
+    grid-template-columns: minmax(280px, 390px) minmax(0, 0.9fr);
+  }
+  .how-mobile-item:nth-child(even) .how-mobile-copy {
+    order: 2;
+  }
+  .how-mobile-copy h3 {
+    font-family: var(--font-brand);
+    font-size: clamp(32px, 3.4vw, 54px);
+    font-weight: 600;
+    line-height: 1.08;
+    letter-spacing: -0.8px;
+    color: #fff;
+    margin-bottom: 22px;
+    text-transform: none;
+  }
+  .how-mobile-copy .light {
+    color: rgba(255,255,255,0.50);
+  }
+  .how-mobile-copy p {
+    max-width: 440px;
+    color: var(--text-secondary);
+    font-size: 16px;
+    line-height: 1.74;
+  }
+  .how-mobile-phone-wrap {
+    width: min(380px, 34vw, 38vh);
+    margin: 0 auto;
+  }
+  .phone.how-mobile-phone {
+    width: 100%;
+    min-height: 0;
+    margin: 0 auto;
+    transform: none;
   }
   .how-work-layout {
     display: grid;
@@ -545,7 +595,8 @@
   }
   .proto-lounge,
   .proto-option,
-  .proto-result {
+  .proto-result,
+  .proto-voice-talk {
     flex: 1;
     min-height: 0;
     display: flex;
@@ -1071,15 +1122,22 @@
     .final h2 { font-size: 50px; }
 
     /* ─── MOBILE HOW NINE LAYOUT ─── */
-    .how-nine--mobile {
+    .how-nine {
       overflow: visible !important;
       min-height: 0 !important;
       padding-bottom: 72px !important;
     }
-    .how-nine--mobile .how-work-shell { display: none; }
-    .how-nine--mobile .how-mobile { display: flex; flex-direction: column; }
-    .how-mobile-item { margin-bottom: 72px; }
-    .how-mobile-item:last-child { margin-bottom: 0; }
+    .how-mobile {
+      gap: 72px;
+    }
+    .how-mobile-item,
+    .how-mobile-item:nth-child(even) {
+      display: block;
+      min-height: 0;
+    }
+    .how-mobile-item:nth-child(even) .how-mobile-copy {
+      order: 0;
+    }
     .how-mobile-copy { margin-bottom: 28px; }
     .how-mobile-copy h3 {
       font-family: var(--font-brand);
@@ -1165,6 +1223,148 @@
   }
 
   /* ─── PROTO SCORE CARD ─── */
+  /* ─── PROTO VOICE TALK ─── */
+  .proto-voice-talk {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .proto-voice-bottom {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .proto-voice-question {
+    font-size: 11px;
+    color: rgba(255,255,255,0.55);
+    margin-bottom: 14px;
+    line-height: 1.4;
+    text-align: center;
+  }
+  .proto-voice-images {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .proto-voice-img-card {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #3a3a3a;
+  }
+  .proto-voice-label {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    background: rgba(0,0,0,0.65);
+    color: #fff;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+  }
+  .proto-life-guide {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: 8px;
+    row-gap: 6px;
+    margin-bottom: 10px;
+  }
+  .proto-life-card {
+    background: #d9d9d9;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: #000;
+    text-align: center;
+    aspect-ratio: 1 / 1;
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+  .proto-life-card.pressed {
+    transform: scale(0.92);
+    background: #b8b8b8;
+  }
+  .proto-life-modal {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.88);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+    z-index: 2;
+  }
+  .proto-life-modal.active {
+    opacity: 1;
+  }
+  .proto-life-modal-content {
+    background: #3a3a3a;
+    border-radius: 16px;
+    padding: 20px 18px;
+    text-align: center;
+    width: 100%;
+    height: 110px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .proto-life-modal-cat {
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #b0b0b0;
+    margin-bottom: 10px;
+  }
+  .proto-life-modal-q {
+    font-size: 12px;
+    line-height: 1.55;
+    color: #fff;
+  }
+  .proto-voice-timer {
+    text-align: center;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    color: rgba(255,255,255,0.70);
+  }
+  .proto-voice-controls {
+    display: flex;
+    justify-content: center;
+    gap: 28px;
+  }
+  .proto-ctrl-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #525252;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    flex-shrink: 0;
+  }
+  .proto-ctrl-btn.end {
+    background: #ff4444;
+  }
+  .proto-ctrl-btn svg {
+    width: 20px;
+    height: 20px;
+    stroke: #fff;
+    fill: none;
+  }
   .proto-score-card {
     padding: 14px 16px;
     border-radius: 16px;
@@ -1250,60 +1450,125 @@
   }
 
   /* ─── SCROLL HINT ─── */
-  .scroll-hint {
-    font-family: var(--font-ui);
-    font-size: 11px;
-    letter-spacing: 0.22em;
-    text-transform: uppercase;
-    color: rgba(255,255,255,0.35);
-    animation: scrollHintBlink 2.8s ease-in-out infinite;
-  }
   @keyframes scrollHintBlink {
     0%, 100% { opacity: 0.9; }
     50% { opacity: 0.12; }
   }
 
+  .hero-inactive-msg {
+    font-family: var(--font-brand);
+    font-size: 16px;
+    font-style: italic;
+    line-height: 1.7;
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  /* ─── HERO STATES (shared position, crossfade on 9pm) ─── */
+
+  /* h1 wrapper: day in flow provides height, night overlaid absolutely */
+  .hero-h1-wrap { position: relative; }
+  .hero-h1-night {
+    position: absolute; top: 0; left: 0; width: 100%;
+    opacity: 0; transform: translateY(20px); pointer-events: none;
+  }
+  .hero-night-accent {
+    font-style: normal;
+    background: var(--grad-primary);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* sub-text wrapper: same layout trick */
+  .hero-cta-col { flex-direction: column; align-items: flex-start; gap: 40px; }
+  .hero-sub-wrap { position: relative; }
+  /* identical font for both states */
+  .hero-sub-text {
+    font-family: var(--font-brand);
+    font-size: 16px; font-style: italic;
+    line-height: 1.7; color: rgba(255,255,255,0.55);
+    margin: 0;
+  }
+  .hero-sub-night {
+    position: absolute; top: 0; left: 0; width: 100%;
+    opacity: 0; transform: translateY(20px); pointer-events: none;
+    white-space: nowrap;
+  }
+
+  /* button starts invisible */
+  .hero-btn-wrap { opacity: 0; transform: translateY(24px); }
+  .hero-btn-wrap.is-visible {
+    opacity: 1; transform: none;
+    transition: opacity 0.9s cubic-bezier(0.16,1,0.3,1),
+                transform 0.9s cubic-bezier(0.16,1,0.3,1);
+  }
+
+  /* ─── NIGHT STATE transitions (triggered by hero.is-night-active) ─── */
+  .hero.is-night-active .hero-h1-day {
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  .hero.is-night-active .hero-h1-night {
+    opacity: 1; transform: translateY(0); pointer-events: auto;
+    transition: opacity 0.9s cubic-bezier(0.16,1,0.3,1),
+                transform 0.9s cubic-bezier(0.16,1,0.3,1);
+  }
+  .hero.is-night-active .hero-sub-day {
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  .hero.is-night-active .hero-sub-night {
+    opacity: 1; transform: translateY(0); pointer-events: auto;
+    transition: opacity 0.9s cubic-bezier(0.16,1,0.3,1) 0.1s,
+                transform 0.9s cubic-bezier(0.16,1,0.3,1) 0.1s;
+  }
+  /* instant (no animation) for initial load during night */
+  .hero.is-night-instant .hero-h1-day,
+  .hero.is-night-instant .hero-sub-day { opacity: 0; transition: none; }
+  .hero.is-night-instant .hero-h1-night,
+  .hero.is-night-instant .hero-sub-night { opacity: 1; transform: none; transition: none; }
+
   @media (prefers-reduced-motion: reduce) {
     .reveal { transition: none; opacity: 1; transform: none; }
-    .scroll-hint { animation: none; opacity: 0.4; }
+    .hero-scroll-cue { animation: none; opacity: 0.4; }
     .odometer-digit-inner { transition: none; }
     .proto-track-inner { animation: none; }
     .proto-result .proto-row { opacity: 1; transform: none; }
     .proto-result .proto-row.proto-msg-in { animation: none; }
   }
-  .journal-text-overlay {
+  .constellation-overlay {
     position: absolute;
     inset: 0;
     pointer-events: none;
     opacity: 0;
   }
-  .journal-word {
+  .constellation-word {
     position: absolute;
     transform: translate(-50%, -50%);
-    color: var(--aurora-paper-dim);
-    font-family: inherit;
+    display: flex;
+    align-items: center;
+    gap: 8px;
     white-space: nowrap;
-  }
-  .chem-text-overlay {
-    position: absolute;
-    left: max(80px, calc((100vw - 1280px) / 2 + 80px));
-    top: calc(var(--what-top, 50%) + 80px);
-    transform: translateY(-50%);
-    pointer-events: none;
-    opacity: 0;
-    text-align: left;
+    color: rgba(220, 205, 255, 0.85);
     font-family: inherit;
-    font-size: 13px;
-    line-height: 1.7;
-    color: var(--aurora-paper-dim);
-    max-width: 220px;
+    font-size: 12px;
   }
-  @media (max-width: 960px) {
-    .chem-text-overlay { top: calc(var(--what-top, 50%) + 100px); }
+  .constellation-word::before {
+    content: '';
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
   }
-  @media (max-width: 420px) {
-    .chem-text-overlay { left: 24px; }
+  .constellation-word.dot-pink::before {
+    background: #ff6fae;
   }
+  .constellation-word.dot-purple::before {
+    background: #8e7cff;
+  }
+  /* legacy — hide old overlays if still in DOM */
+  .journal-text-overlay, .chem-text-overlay { display: none; }
+  .journal-word { display: none; }
 </style>
 <link rel="stylesheet" href="./interactive.css">
 </head>
@@ -1312,6 +1577,14 @@
 <canvas class="night-canvas" id="nightCanvas" aria-hidden="true" width="2560" height="1440"></canvas>
 <div class="cursor-light" aria-hidden="true"></div>
 <div class="grain-layer" aria-hidden="true"></div>
+<div class="dark-room-clock" aria-hidden="true"></div>
+<div class="orbit-rings-clock" aria-hidden="true">
+  <canvas class="orbit-rings-canvas"></canvas>
+</div>
+<svg class="orbit-rings-overlay" aria-hidden="true">
+  <ellipse class="orbit-ring-1"/>
+  <ellipse class="orbit-ring-2"/>
+</svg>
 
 <!-- ─── TOP NAV ─── -->
 <nav class="topnav">
@@ -1332,37 +1605,35 @@
   <div class="container">
     <div class="grid">
       <div>
-        <h1 class="reveal"><span class="nobreak">kindred souls</span><br><span class="nobreak">matched by voice</span></h1>
-        <div class="cta-row reveal d1">
-          <a href="#cta" class="btn btn-primary">
-            join the waitlist
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"></path></svg>
-          </a>
+        <!-- h1 wrapper: both states overlap — day in flow, night absolute on top -->
+        <div class="hero-h1-wrap">
+          <h1 class="reveal hero-h1-day"><span class="nobreak">Meet your match</span> <span class="nobreak">at nine</span></h1>
+          <h1 class="hero-h1-night" aria-hidden="true"><span class="nobreak">Meet your match</span> <em class="hero-night-accent nobreak">at nine</em></h1>
+        </div>
+        <!-- sub-text + button: same font class, night text absolute over day -->
+        <div class="cta-row hero-cta-col reveal d1">
+          <div class="hero-sub-wrap">
+            <p class="hero-sub-text hero-sub-day">current time is <span data-hero-time-value="">--:-- am</span>.</p>
+            <p class="hero-sub-text hero-sub-night" aria-hidden="true">kindred souls matched by voice</p>
+          </div>
+          <div class="hero-btn-wrap" id="heroBtnWrap" style="display:none">
+            <a href="#cta" class="btn btn-primary" id="heroWaitlistBtn">
+              join the waitlist
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"></path></svg>
+            </a>
+          </div>
         </div>
       </div>
 
-      <!-- score visual -->
+      <!-- time visual -->
       <div class="phone-wrap">
         <div class="phone">
           <div class="bezel">
-            <div class="sphere-stage">
-              <svg class="app-sphere" viewBox="-100 -100 200 200" preserveAspectRatio="xMidYMid meet">
-                <g>
-                  <ellipse rx="82" ry="30"></ellipse>
-                  <ellipse rx="82" ry="30" transform="rotate(30)"></ellipse>
-                  <ellipse rx="82" ry="30" transform="rotate(60)"></ellipse>
-                  <ellipse rx="82" ry="30" transform="rotate(90)"></ellipse>
-                  <ellipse rx="82" ry="30" transform="rotate(120)"></ellipse>
-                  <ellipse rx="82" ry="30" transform="rotate(150)"></ellipse>
-                </g>
-              </svg>
-              <div class="number" data-hero-score-value="">50</div>
+            <div class="sphere-stage hero-time-stage">
+              <div class="hero-clock" data-hero-clock aria-label="current time">
+                <canvas class="hero-clock-canvas" data-hero-clock-canvas aria-hidden="true"></canvas>
+              </div>
             </div>
-            <div class="scr-caption" data-hero-score-caption="">
-              Probably not the one.<br>
-              Whether to continue is up to you.
-            </div>
-            <div class="scroll-hint" aria-hidden="true">scroll down</div>
           </div>
           <div class="glass"></div>
         </div>
@@ -1439,22 +1710,38 @@
       <use href="#ast-star" x="870" y="510" width="5" height="5" opacity="0.10"></use>
       <use href="#ast-star" x="600" y="480" width="4" height="4" opacity="0.08"></use>
       <use href="#ast-star" x="790" y="30" width="4" height="4" opacity="0.08"></use>
+
+      <!-- mobile-visible center stars (x 500–900, visible when SVG is sliced on narrow screens) -->
+      <use href="#ast-star" x="560" y="150" width="7" height="7" opacity="0.20" class="twinkle d1"></use>
+      <use href="#ast-star" x="630" y="60" width="5" height="5" opacity="0.14"></use>
+      <use href="#ast-star" x="710" y="200" width="8" height="8" opacity="0.22" class="twinkle d2"></use>
+      <use href="#ast-star" x="840" y="130" width="6" height="6" opacity="0.16"></use>
+      <use href="#ast-star" x="580" y="400" width="6" height="6" opacity="0.18" class="twinkle d3"></use>
+      <use href="#ast-star" x="680" y="440" width="5" height="5" opacity="0.12"></use>
+      <use href="#ast-star" x="770" y="380" width="7" height="7" opacity="0.20"></use>
+      <use href="#ast-star" x="860" y="430" width="5" height="5" opacity="0.14" class="twinkle d1"></use>
+      <use href="#ast-star" x="545" y="240" width="5" height="5" opacity="0.11"></use>
+      <use href="#ast-star" x="895" y="200" width="6" height="6" opacity="0.16"></use>
+      <use href="#ast-star" x="720" y="490" width="5" height="5" opacity="0.13"></use>
+      <use href="#ast-star" x="810" y="540" width="7" height="7" opacity="0.18" class="twinkle d2"></use>
+      <use href="#ast-star" x="640" y="170" width="4" height="4" opacity="0.10"></use>
+      <use href="#ast-star" x="880" y="370" width="5" height="5" opacity="0.12"></use>
     </svg>
   </div>
 
   <div class="container">
     <blockquote class="quote reveal">
-      a thousand voices in the dark.<br>
-      <span class="light">one of them, <em class="kindred">kindred</em>.</span>
+      <span class="nobreak">thousand voices</span> <span class="nobreak">in the dark</span>.<br>
+      <span class="light"><span class="nobreak">one of them</span>, <em class="kindred">kindred</em>.</span>
     </blockquote>
-    <p class="dark-room-sub reveal d1">we hope you find one and stay there.</p>
+    <p class="dark-room-sub reveal d1">we hope you find one and stay there</p>
   </div>
 </section>
 
 <section class="sphere-transition sphere-approach" id="sphere-approach">
   <div class="what-intro-copy">
     <div class="story-kicker reveal">what you get</div>
-    <h2 class="reveal d1"><span class="light">more</span> than a match</h2>
+    <h2 class="reveal d1"><span class="light">more</span> <span class="nobreak">than a match</span></h2>
   </div>
 </section>
 
@@ -1467,8 +1754,8 @@
   <div class="container">
     <div class="story-grid">
       <div class="story-copy reveal">
-        <h2>your kindred</h2>
-        <p>no swiping, no endless decks. night after night, coco learns who you are and brings you closer to the one who truly fits.</p>
+        <h2>meet your kindred</h2>
+        <p>no swiping, no endless seraching. just one conversation at a time, until someone starts to feel familiar.</p>
       </div>
       <div class="story-visual what-sphere-slot reveal d1" aria-hidden="true"></div>
     </div>
@@ -1480,8 +1767,8 @@
   <div class="container">
     <div class="story-grid">
       <div class="story-copy reveal">
-        <h2>chemistry analysis</h2>
-        <p>after the call, coco maps the two of you and breaks down exactly how your worlds meet.</p>
+        <h2>chemistry, softly mapped</h2>
+        <p>after each call, coco traces where your worlds overlap - the little rhythms, values, and moments that felt mutual.</p>
       </div>
       <div class="story-visual what-sphere-slot reveal d1" aria-hidden="true"></div>
     </div>
@@ -1494,7 +1781,7 @@
     <div class="story-grid">
       <div class="story-copy reveal">
         <h2>self journaling</h2>
-        <p>every conversation reveals a little more of you. explore what you love, bubble by bubble.</p>
+        <p>every conversation reveals a little more of you. explore what you love and what kind of connection keeps glowing.</p>
       </div>
       <div class="story-visual what-sphere-slot reveal d1" aria-hidden="true"></div>
     </div>
@@ -1507,7 +1794,7 @@
 <section class="sphere-transition sphere-approach" id="how-intro">
   <div class="what-intro-copy">
     <div class="story-kicker reveal">how about nine works</div>
-    <h2 class="reveal d1">three rounds of checking <span class="light">how well you click.</span></h2>
+    <h2 class="reveal d1"><span class="nobreak">three rounds of</span> checking <span class="light nobreak">how well you click</span></h2>
   </div>
 </section>
 
@@ -1583,30 +1870,39 @@
                 </div>
 
                 <div class="how-phone-screen" data-how-slide="" aria-hidden="true">
-                  <div class="proto-option">
+                  <div class="proto-voice-talk">
                     <div class="proto-brand">about nine</div>
-                    <div class="proto-option-head">
-                      <div class="proto-topic">food</div>
-                      <div class="proto-question">which would you pick<br>for a late dinner?</div>
+                    <div class="proto-life-guide">
+                      <div class="proto-life-card" data-cat="life">life</div>
+                      <div class="proto-life-card" data-cat="time">time</div>
+                      <div class="proto-life-card" data-cat="travel">travel</div>
+                      <div class="proto-life-card" data-cat="relationship">relationship</div>
+                      <div class="proto-life-card" data-cat="love">love</div>
+                      <div class="proto-life-card" data-cat="money">money</div>
                     </div>
-                    <div class="proto-carousel-wrap">
-                      <div class="proto-dots" aria-hidden="true"><i class="active"></i><i></i><i></i></div>
-                      <div class="proto-carousel">
-                        <div class="proto-food-card center">
-                          <img src="./images/food/pizza/hawaiian-pizza.png" alt="hawaiian pizza">
-                          <span>hawaiian</span>
-                        </div>
-                        <div class="proto-food-card">
-                          <img src="./images/food/pizza/margherita-pizza.png" alt="margherita pizza">
-                          <span>margherita</span>
-                        </div>
-                        <div class="proto-food-card">
-                          <img src="./images/food/pizza/funghi-pizza.png" alt="funghi pizza">
-                          <span>funghi</span>
-                        </div>
+                    <div class="proto-voice-bottom">
+                      <div class="proto-voice-timer">00:00 / 40:00</div>
+                      <div class="proto-voice-controls">
+                        <button class="proto-ctrl-btn" type="button" aria-label="mute">
+                          <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                            <path d="M12 19v4"/>
+                          </svg>
+                        </button>
+                        <button class="proto-ctrl-btn end" type="button" aria-label="end call">
+                          <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M6.62 10.79C8.06 13.62 10.38 15.94 13.21 17.38L15.41 15.18C15.68 14.91 16.08 14.82 16.43 14.94C17.55 15.31 18.76 15.51 20 15.51C20.55 15.51 21 15.96 21 16.51V20C21 20.55 20.55 21 20 21C10.61 21 3 13.39 3 4C3 3.45 3.45 3 4 3H7.5C8.05 3 8.5 3.45 8.5 4C8.5 5.24 8.7 6.45 9.07 7.57C9.18 7.92 9.1 8.31 8.82 8.59L6.62 10.79Z" fill="#fff" stroke="none"/>
+                          </svg>
+                        </button>
                       </div>
                     </div>
-                    <button class="proto-enter" type="button">enter</button>
+                  </div>
+                  <div class="proto-life-modal" aria-hidden="true">
+                    <div class="proto-life-modal-content">
+                      <div class="proto-life-modal-cat"></div>
+                      <div class="proto-life-modal-q"></div>
+                    </div>
                   </div>
                 </div>
 
@@ -1707,7 +2003,7 @@
 <!-- ─── FINAL CTA ─── -->
 <section class="final" id="cta">
   <div class="container">
-    <h2 class="reveal" style="margin-top: 70px;">tonight, <span class="light">at nine.</span></h2>
+    <h2 class="reveal" style="margin-top: 70px;">tonight, <span class="light nobreak">at nine.</span></h2>
     <p class="reveal d1">about nine is in private beta in new york and los angeles.<br>join the waitlist and we will write when your night is ready.</p>
     <form class="waitlist-form reveal d2" id="finalWaitlistForm" novalidate="">
       <label class="waitlist-label" for="finalWaitlistEmail">email</label>

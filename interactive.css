@@ -10,9 +10,9 @@
   --aurora-violet: #9a8fc0;
   --aurora-line: rgba(246, 243, 238, 0.10);
   --aurora-glass: rgba(255, 255, 255, 0.05);
-  --aurora-opacity: 0;
-  --cursor-glow-opacity: 0;
-  --hero-glow-opacity: 0;
+  --aurora-opacity: 0.55;
+  --cursor-glow-opacity: 0.74;
+  --hero-glow-opacity: 1;
   --warm-glow: rgba(209, 53, 136, 0.18);
   --rose-glow: rgba(209, 53, 136, 0.16);
   --blue-glow: rgba(94, 96, 201, 0.16);
@@ -27,6 +27,11 @@ body {
   background: var(--aurora-ink);
   color: var(--aurora-paper);
   isolation: isolate;
+}
+
+.nobreak {
+  display: inline-block;
+  white-space: nowrap;
 }
 
 body::before {
@@ -71,6 +76,74 @@ body > footer {
 .grain-layer {
   pointer-events: none;
   position: fixed;
+}
+
+.orbit-rings-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+  overflow: visible;
+}
+
+.orbit-ring-1,
+.orbit-ring-2 {
+  fill: none;
+  opacity: 0;
+}
+
+.orbit-ring-1 {
+  stroke: rgba(244, 168, 200, 0.58);
+  stroke-width: 1.5;
+}
+
+.orbit-ring-2 {
+  stroke: rgba(216, 192, 255, 0.62);
+  stroke-width: 1.2;
+}
+
+.dark-room-clock {
+  position: fixed;
+  pointer-events: none;
+  z-index: 2;
+  width: var(--drck-size, 200px);
+  height: var(--drck-size, 200px);
+  left: var(--drck-x, 82%);
+  top: var(--drck-y, 82%);
+  transform: translate(-50%, -50%);
+  opacity: var(--drck-opacity, 0);
+  visibility: hidden;
+  will-change: opacity, left, top;
+}
+
+.orbit-rings-clock {
+  position: fixed;
+  pointer-events: none;
+  z-index: 0;
+  width: var(--ork-size, 200px);
+  height: var(--ork-size, 200px);
+  left: var(--ork-x, 82%);
+  top: var(--ork-y, 82%);
+  transform: translate3d(-50%, -50%, 0);
+  opacity: var(--ork-opacity, 0);
+  visibility: hidden;
+  contain: layout paint;
+  backface-visibility: hidden;
+  will-change: opacity, left, top, width, height;
+}
+
+.orbit-rings-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.dark-room-clock-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .night-canvas {
@@ -144,8 +217,14 @@ footer a,
 .proto-speaker,
 .scroll-hint,
 .waitlist-message,
-.waitlist-input::placeholder {
+.waitlist-input::placeholder,
+.hero-sub-text {
   color: var(--aurora-paper-dim);
+}
+
+/* hide btn wrap on mobile same as the button */
+@media (max-width: 960px) {
+  #heroBtnWrap { display: none !important; }
 }
 
 .nav-links a:hover,
@@ -165,19 +244,25 @@ footer a:hover,
 .how-nine h2 .light,
 .how-work-copy h3 .light,
 .final h2 .light {
+  color: #d13588;
   background: var(--grad-primary);
   -webkit-background-clip: text;
   background-clip: text;
-  color: transparent;
   -webkit-text-fill-color: transparent;
+  /* inline-block + translateZ forces own compositing layer in Safari,
+     fixing background-clip:text inside will-change:opacity parents */
+  display: inline-block;
+  transform: translateZ(0);
 }
 
 .dark-room .quote em.kindred {
+  color: #d13588;
   background: var(--grad-primary);
   -webkit-background-clip: text;
   background-clip: text;
-  color: transparent;
   -webkit-text-fill-color: transparent;
+  display: inline-block;
+  transform: translateZ(0);
 }
 
 .section-eyebrow,
@@ -218,10 +303,11 @@ footer a:hover,
 }
 
 .hero {
-  --hero-pad-x: clamp(32px, 7.5vw, 140px);
+  --hero-pad-x: 80px;
   --hero-gap: clamp(30px, 4.6vw, 76px);
   --hero-phone-width: min(380px, 24vw, 38vh);
   --hero-score-scroll: min(1180px, 128svh);
+  --hero-clock-size: min(320px, 24vw, 38vh);
   display: block;
   overflow: visible;
   min-height: calc(100svh + var(--hero-score-scroll));
@@ -257,7 +343,9 @@ footer a:hover,
   align-items: center;
   width: 100%;
   height: 100svh;
-  max-width: none;
+  max-width: 1280px;
+  margin-left: auto;
+  margin-right: auto;
   padding-left: var(--hero-pad-x);
   padding-right: var(--hero-pad-x);
   padding-top: clamp(88px, 11vh, 118px);
@@ -354,6 +442,13 @@ footer a:hover,
   background: transparent;
   box-shadow: none;
   overflow: visible;
+  /* Safari: preserve-3d on parent prevents WebGL canvas from rendering */
+  transform-style: flat;
+}
+
+.hero .phone-wrap {
+  transform-style: flat;
+  perspective: none;
 }
 
 .hero .phone::before,
@@ -372,11 +467,39 @@ footer a:hover,
   transform: none;
 }
 
-.hero .phone .sphere-stage::before {
-  inset: -48px;
-  background: radial-gradient(circle at center, rgba(220,200,255,0.20) 0%, transparent 62%);
-  filter: blur(18px);
-  opacity: var(--hero-glow-opacity);
+.hero .phone .hero-time-stage {
+  width: var(--hero-clock-size);
+  height: var(--hero-clock-size);
+  display: grid;
+  place-items: center;
+  perspective: none;
+}
+
+.hero .phone .hero-time-stage::before {
+  inset: -36%;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(232,126,158,0.34) 0%, rgba(176,94,126,0.18) 34%, transparent 68%);
+  filter: blur(28px);
+  opacity: calc(0.64 + var(--hero-glow-opacity) * 0.36);
+}
+
+.hero-clock {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 1;
+  flex: none;
+  overflow: visible;
+  border-radius: 0;
+  /* filter removed: Safari does not render WebGL canvas children of filtered elements */
+}
+
+.hero-clock-canvas {
+  position: absolute;
+  inset: -52%;
+  width: 204%;
+  height: 204%;
+  display: block;
 }
 
 .hero .phone .number {
@@ -385,9 +508,10 @@ footer a:hover,
   font-variant-numeric: tabular-nums;
 }
 
+
 .hero .phone .scr-caption {
   width: min(100%, 340px);
-  min-height: 5.8em;
+  min-height: 1.8em;
   line-height: 1.7;
 }
 
@@ -419,6 +543,14 @@ footer a:hover,
 
 .phone .bezel {
   transform: translateZ(20px);
+}
+
+/* When canvas is teleported to dark-room-clock, hide hero CSS glows
+   so they don't paint above the sphere (which is now in dark-room-clock) */
+.hero.clock-transiting .phone-wrap::before,
+.hero.clock-transiting .sphere-stage::before {
+  opacity: 0;
+  transition: opacity 0.25s ease;
 }
 
 .dark-room {
@@ -499,6 +631,7 @@ footer a:hover,
   background: rgba(255,255,255,0.05);
   color: var(--aurora-paper);
   outline: none;
+  -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
   text-transform: none;
   transition: border-color 0.25s ease, background 0.25s ease, box-shadow 0.25s ease;
@@ -680,6 +813,10 @@ footer {
 }
 
 @media (max-width: 960px) {
+  .dark-room-clock {
+    --drck-size: 140px;
+  }
+
   html {
     scrollbar-gutter: auto;
   }
@@ -709,9 +846,13 @@ footer {
   }
 
   .hero .grid {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
     gap: 38px;
-    justify-items: stretch;
+  }
+
+  .hero .grid > div:first-child {
+    display: contents;
   }
 
   .topnav .nav-links {
@@ -732,16 +873,46 @@ footer {
   }
 
   .hero .cta-row {
-    display: none;
+    order: 3;
+    display: flex;
+    justify-content: center;
+  }
+
+  .hero-cta-col {
+    align-items: center;
+    width: 100%;
+  }
+
+  .hero-sub-wrap {
+    width: 100%;
+    text-align: center;
+  }
+
+  .hero-sub-night {
+    left: 50%;
+    width: max-content;
+    max-width: calc(100vw - 48px);
+    transform: translate(-50%, 20px);
+  }
+
+  .hero.is-night-active .hero-sub-night,
+  .hero.is-night-instant .hero-sub-night {
+    transform: translate(-50%, 0);
+  }
+
+  #heroWaitlistBtn {
+    display: none !important;
   }
 
   .hero .phone-wrap {
+    order: 2;
     justify-self: center;
     margin-left: auto;
     margin-right: auto;
   }
 
   .hero h1 {
+    order: 1;
     font-size: 56px;
     line-height: 1.06;
     text-wrap: auto;
@@ -750,6 +921,11 @@ footer {
   .hero h1 .nobreak,
   .hero h1 .accent {
     white-space: nowrap;
+  }
+
+  .hero h1 .nobreak + .nobreak,
+  .hero-h1-night .nobreak + .nobreak {
+    display: block;
   }
 
   .hero h1 .nobreak {
@@ -785,6 +961,21 @@ footer {
   .phone {
     width: min(100%, 320px);
     min-height: auto;
+  }
+
+  .how-mobile-phone-wrap,
+  .how-phone-stage {
+    width: min(280px, 72vw);
+    max-width: 280px;
+    padding: 0;
+  }
+
+  .phone.how-mobile-phone,
+  .how-work-phone {
+    width: 100%;
+    aspect-ratio: 9 / 19;
+    min-height: 0 !important;
+    height: auto;
   }
 
   .phone::before {
@@ -876,7 +1067,7 @@ footer {
   }
 
   .how-phone-stage {
-    padding: 0 40px;
+    padding: 0;
   }
 }
 
@@ -921,18 +1112,27 @@ footer {
 
 @media (max-width: 960px) {
   :root {
-    --display-heading-size: 56px;
+    --display-heading-size: clamp(44px, 11vw, 56px);
+  }
+}
+
+@media (max-width: 600px) {
+  :root {
+    --display-heading-size: clamp(32px, 8.6vw, 42px);
   }
 }
 
 @media (max-width: 420px) {
   :root {
-    --display-heading-size: 38px;
+    --display-heading-size: 27px;
   }
-}
 
-@media (max-width: 360px) {
-  :root {
-    --display-heading-size: 32px;
+  .hero h1 {
+    position: relative;
+    width: 100%;
+  }
+
+  .hero .phone-wrap {
+    margin-top: 52px;
   }
 }

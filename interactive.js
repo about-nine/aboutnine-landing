@@ -23,6 +23,12 @@
   const whatSphereCanvas = whatSphere ? whatSphere.querySelector('.what-sphere-canvas') : null;
   const heroScoreValue = document.querySelector('[data-hero-score-value]');
   const heroScoreCaption = document.querySelector('[data-hero-score-caption]');
+  const heroClock = document.querySelector('[data-hero-clock]');
+  const heroClockCanvas = document.querySelector('[data-hero-clock-canvas]');
+  const heroTimeValue = document.querySelector('[data-hero-time-value]');
+  const heroTimeCaption = document.querySelector('[data-hero-time-caption]');
+  const heroWaitlistBtn = document.getElementById('heroWaitlistBtn');
+  const heroBtnWrap = document.getElementById('heroBtnWrap');
   const whatSections = [
     document.querySelector('.what-kindred'),
     document.querySelector('.what-chemistry'),
@@ -31,9 +37,15 @@
 
   let latestProgress = 0;
   let rafPending = false;
+  let isNightActive = false;
+  let prevNightActive = false;
   let activeHowSlide = 0;
   let howMobileEl = null;
   let howCarouselIsBound = false;
+  let heroClock3D = null;
+  let darkRoomClockTransiting = false;
+  let orbitRings3D = null;
+  let whatSphereState = null; // shared state for orbit-rings-clock section phase
   let whatSphere3D = null;
   let whatSphereRenderRaf = null;
 
@@ -82,7 +94,10 @@
     chemProgress: 0,
     centerGlow: 0,
     orbitGlow: 0,
+    kindredProgress: 0,
     journalProgress: 0,
+    ringAppearProgress: 0,
+    orbitProgress: 0,
   };
   let whatSphereTarget = { ...whatSphereDefault };
   let whatSphereCurrent = { ...whatSphereDefault };
@@ -90,6 +105,41 @@
   let heroScoreCaptionId = '';
   let heroScoreCaptionTimer = null;
   let odometerSlots = [];
+  const heroClockBaseTime = new Date();
+  const heroClockStartedActive = (() => { const h = heroClockBaseTime.getHours(); return h >= 21 || h < 2; })();
+  const HERO_CLOCK_SCROLL_MINUTES = (() => {
+    const baseMin = heroClockBaseTime.getHours() * 60 + heroClockBaseTime.getMinutes() + heroClockBaseTime.getSeconds() / 60;
+    const h = heroClockBaseTime.getHours();
+    const BUFFER = 10;
+    if (h >= 21 || h < 2) {
+      let mins = 2 * 60 - baseMin;
+      if (mins <= 0) mins += 24 * 60;
+      return Math.min(480, Math.max(90, mins + BUFFER));
+    }
+    let mins = 21 * 60 - baseMin;
+    if (mins <= 0) mins += 24 * 60;
+    return Math.min(720, Math.max(120, mins + BUFFER));
+  })();
+  const HERO_NIGHT_HOLDS = (() => {
+    const baseMin = heroClockBaseTime.getHours() * 60 + heroClockBaseTime.getMinutes() + heroClockBaseTime.getSeconds() / 60;
+    const holds = [];
+    const addHold = (targetMin) => {
+      let diff = targetMin - baseMin;
+      if (diff <= 0) diff += 24 * 60;
+      const at = diff / HERO_CLOCK_SCROLL_MINUTES;
+      if (at > 0.01 && at < 0.99) holds.push({ at, radius: 0.06, strength: 0.96 });
+    };
+    addHold(21 * 60);
+    addHold(2 * 60);
+    return holds;
+  })();
+  let heroLastTimeText = '';
+  let heroNightLockProgress = null;
+  const heroClockState = {
+    progress: 0,
+    hourAngle: -Math.PI / 2,
+    minuteAngle: -Math.PI / 2,
+  };
 
   function setHeroScoreCaption(caption, immediate = false) {
     if (!heroScoreCaption || heroScoreCaptionId === caption.id) return;
@@ -190,12 +240,51 @@
     }, progress));
   }
 
+  function applyNightActiveState() {
+    const justActivated = isNightActive && !prevNightActive;
+    prevNightActive = isNightActive;
+
+    if (hero) {
+      if (isNightActive) {
+        if (justActivated && !reduceMotion) {
+          hero.classList.remove('is-night-instant');
+          hero.classList.add('is-night-active');
+          // Show button after sub-text animation starts
+          if (heroBtnWrap) {
+            heroBtnWrap.style.display = '';
+            window.setTimeout(() => {
+              if (isNightActive) heroBtnWrap.classList.add('is-visible');
+            }, 220);
+          }
+        } else {
+          hero.classList.add('is-night-active', 'is-night-instant');
+          if (heroBtnWrap) {
+            heroBtnWrap.style.display = '';
+            heroBtnWrap.classList.add('is-visible');
+          }
+        }
+      } else {
+        hero.classList.remove('is-night-active', 'is-night-instant');
+        if (heroBtnWrap) {
+          heroBtnWrap.style.display = 'none';
+          heroBtnWrap.classList.remove('is-visible');
+        }
+      }
+    }
+  }
+
+  function initHeroTimeGate() {
+    const h = new Date().getHours();
+    isNightActive = h >= 21 || h < 2;
+    prevNightActive = isNightActive; // no animation on initial load
+    applyNightActiveState();
+  }
+
   function updateAuroraProgress(progress) {
-    const eased = progress * progress * (3 - 2 * progress);
     const cursorMax = window.innerWidth <= 960 ? 0.38 : 0.74;
-    root.style.setProperty('--aurora-opacity', (eased * 0.55).toFixed(3));
-    root.style.setProperty('--cursor-glow-opacity', (eased * cursorMax).toFixed(3));
-    root.style.setProperty('--hero-glow-opacity', eased.toFixed(3));
+    root.style.setProperty('--aurora-opacity', '0.55');
+    root.style.setProperty('--cursor-glow-opacity', cursorMax.toFixed(3));
+    root.style.setProperty('--hero-glow-opacity', '1');
   }
 
   function updateHeroScoreVisual(scrollTop = null) {
@@ -212,6 +301,756 @@
 
     setOdometer(Math.round(score), rawProgress === 0 || reduceMotion);
     setHeroScoreCaption(captionForScore(score), rawProgress === 0 || reduceMotion);
+  }
+
+  function formatHeroClockTime(date) {
+    const hours = date.getHours();
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const meridiem = hours >= 12 ? 'pm' : 'am';
+    return `${hours % 12 || 12}:${minutes} ${meridiem}`;
+  }
+
+  function makeHeroPlanetTexture(THREE, palette = {}) {
+    const canvas = document.createElement('canvas');
+    const size = 512;
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    const image = ctx.createImageData(size, size);
+    const data = image.data;
+    const clampByte = (value) => Math.min(255, Math.max(0, value));
+    const base = {
+      r: palette.r ?? 218,
+      g: palette.g ?? 168,
+      b: palette.b ?? 185,
+      noiseR: palette.noiseR ?? 0.72,
+      noiseG: palette.noiseG ?? 0.50,
+      noiseB: palette.noiseB ?? 0.58,
+    };
+
+    const noiseGridSize = 96;
+    const noiseGrid = Array.from({ length: noiseGridSize + 1 }, () => (
+      Array.from({ length: noiseGridSize + 1 }, () => Math.random())
+    ));
+    const fade = (t) => t * t * (3 - 2 * t);
+    const sampleNoise = (x, y) => {
+      const gx = x * noiseGridSize;
+      const gy = y * noiseGridSize;
+      const x0 = Math.floor(gx);
+      const y0 = Math.floor(gy);
+      const tx = fade(gx - x0);
+      const ty = fade(gy - y0);
+      const x1 = Math.min(noiseGridSize, x0 + 1);
+      const y1 = Math.min(noiseGridSize, y0 + 1);
+      const a = lerp(noiseGrid[y0][x0], noiseGrid[y0][x1], tx);
+      const b = lerp(noiseGrid[y1][x0], noiseGrid[y1][x1], tx);
+      return lerp(a, b, ty);
+    };
+
+    for (let y = 0; y < size; y += 1) {
+      for (let x = 0; x < size; x += 1) {
+        const i = (y * size + x) * 4;
+        const nx = x / size;
+        const ny = y / size;
+        const broad = sampleNoise(nx, ny) - 0.5;
+        const fine = sampleNoise((nx * 3.1) % 1, (ny * 3.1) % 1) - 0.5;
+        const vignette = 1 - Math.abs(ny - 0.5) * 0.22;
+        const mottled = broad * 16 + fine * 7 + (Math.random() - 0.5) * 5;
+        data[i] = clampByte((base.r + mottled * base.noiseR) * vignette);
+        data[i + 1] = clampByte((base.g + mottled * base.noiseG) * vignette);
+        data[i + 2] = clampByte((base.b + mottled * base.noiseB) * vignette);
+        data[i + 3] = 255;
+      }
+    }
+
+    ctx.putImageData(image, 0, 0);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(1, 1);
+    return texture;
+  }
+
+  function makeWhatPlanetMaterial(THREE, color, texturePalette) {
+    const texture = makeHeroPlanetTexture(THREE, texturePalette);
+    const material = new THREE.MeshStandardMaterial({
+      color,
+      map: texture,
+      bumpMap: texture,
+      bumpScale: 0.018,
+      roughness: 0.92,
+      metalness: 0,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    });
+    material.userData.texture = texture;
+    return material;
+  }
+
+  function makeHeartTube(THREE, scale, tubeRadius, color, opacity) {
+    const segments = 256;
+    const points = [];
+    for (let i = 0; i <= segments; i += 1) {
+      const t = (Math.PI * 2 * i) / segments;
+      const x = scale * 16 * Math.pow(Math.sin(t), 3);
+      // +4 centres the heart vertically around y = 0
+      const y = scale * (13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t) + 4);
+      points.push(new THREE.Vector3(x, y, 0));
+    }
+    const curve = new THREE.CatmullRomCurve3(points, true);
+    const geometry = new THREE.TubeGeometry(curve, segments, tubeRadius, 6, true);
+    const material = new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity,
+      depthTest: false,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    return new THREE.Mesh(geometry, material);
+  }
+
+  function makeOrbitEllipseTube(THREE, radiusX, radiusY, tubeRadius, color, opacity) {
+    const points = [];
+    const segments = 192;
+    for (let i = 0; i <= segments; i += 1) {
+      const theta = (Math.PI * 2 * i) / segments;
+      points.push(new THREE.Vector3(Math.cos(theta) * radiusX, Math.sin(theta) * radiusY, 0));
+    }
+    const curve = new THREE.CatmullRomCurve3(points, true);
+    const geometry = new THREE.TubeGeometry(curve, segments, tubeRadius, 6, true);
+    const material = new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity,
+      depthTest: false,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    return new THREE.Mesh(geometry, material);
+  }
+
+  function makeHeroCircleTube(THREE, radius, tubeRadius, color, opacity) {
+    const points = [];
+    const segments = 192;
+    for (let i = 0; i <= segments; i += 1) {
+      const theta = (Math.PI * 2 * i) / segments;
+      points.push(new THREE.Vector3(Math.cos(theta) * radius, Math.sin(theta) * radius, 0));
+    }
+    const curve = new THREE.CatmullRomCurve3(points, true);
+    const geometry = new THREE.TubeGeometry(curve, segments, tubeRadius, 6, true);
+    const material = new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity,
+      depthTest: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    return new THREE.Mesh(geometry, material);
+  }
+
+  function buildHeroClockScene(THREE) {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100);
+    camera.position.set(0, 0, 9.15);
+
+    const texture = makeHeroPlanetTexture(THREE);
+    const sphere = new THREE.Mesh(
+      new THREE.SphereGeometry(1.32, 96, 96),
+      new THREE.MeshStandardMaterial({
+        color: 0xf2d0de,
+        map: texture,
+        bumpMap: texture,
+        bumpScale: 0.024,
+        roughness: 0.92,
+        metalness: 0.0,
+      }),
+    );
+    sphere.rotation.set(-0.2, -0.28, 0.04);
+    scene.add(sphere);
+
+    const hourGroup = new THREE.Group();
+    const hourOrbit = makeHeroCircleTube(THREE, 1.58, 0.007, 0xf4a8c8, 0.42);
+    hourOrbit.rotation.x = Math.PI / 2 - 0.14;
+    hourOrbit.rotation.y = 0.06;
+    hourGroup.add(hourOrbit);
+
+    const minuteGroup = new THREE.Group();
+    const minuteOrbit = makeHeroCircleTube(THREE, 2.04, 0.006, 0xd8c0ff, 0.52);
+    minuteOrbit.rotation.x = Math.PI / 2 - 0.06;
+    minuteOrbit.rotation.y = -0.04;
+    minuteGroup.add(minuteOrbit);
+
+    scene.add(hourGroup, minuteGroup);
+
+    scene.add(new THREE.AmbientLight(0xf8d8e8, 0.80));
+    const keyLight = new THREE.DirectionalLight(0xffc8e0, 0.92);
+    keyLight.position.set(-1.7, 2.3, 3.0);
+    scene.add(keyLight);
+    const fillLight = new THREE.PointLight(0x7060d8, 3.2, 7);
+    fillLight.position.set(2.4, -1.6, 2.0);
+    scene.add(fillLight);
+    const auroraLight = new THREE.PointLight(0x9070e8, 1.8, 6);
+    auroraLight.position.set(-1.2, -2.2, -0.8);
+    scene.add(auroraLight);
+
+    return { scene, camera, texture, sphere, hourGroup, minuteGroup };
+  }
+
+  function resizeHeroClock3D() {
+    if (!heroClock3D || !heroClockCanvas) return;
+    const rect = heroClockCanvas.getBoundingClientRect();
+    const width = Math.max(1, Math.round(rect.width));
+    const height = Math.max(1, Math.round(rect.height));
+    if (heroClock3D.width === width && heroClock3D.height === height) return;
+
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    heroClock3D.renderer.setPixelRatio(dpr);
+    heroClock3D.renderer.setSize(width, height, false);
+    heroClock3D.camera.aspect = width / height;
+    heroClock3D.camera.updateProjectionMatrix();
+    heroClock3D.width = width;
+    heroClock3D.height = height;
+  }
+
+  function renderHeroClock3D() {
+    if (!heroClock3D) return;
+    const { progress, hourAngle, minuteAngle } = heroClockState;
+    const roll = progress * Math.PI * 5.4;
+
+    resizeHeroClock3D();
+    heroClock3D.sphere.rotation.x = roll;
+    heroClock3D.sphere.rotation.y = -0.28 + Math.sin(progress * Math.PI * 2) * 0.08;
+    heroClock3D.texture.offset.y = progress * -1.2;
+    heroClock3D.texture.offset.x = progress * 0.14;
+
+    heroClock3D.hourGroup.rotation.z = -hourAngle;
+    heroClock3D.minuteGroup.rotation.z = -minuteAngle;
+
+    heroClock3D.renderer.render(heroClock3D.scene, heroClock3D.camera);
+  }
+
+  async function initHeroClock3D() {
+    if (!heroClock || !heroClockCanvas) return;
+
+    try {
+      const THREE = await import('./vendor/three.module.min.js');
+      const renderer = new THREE.WebGLRenderer({
+        canvas: heroClockCanvas,
+        alpha: true,
+        antialias: true,
+        powerPreference: 'default',
+        preserveDrawingBuffer: true,
+      });
+      renderer.setClearColor(0x000000, 0);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+      const { scene, camera, texture, sphere, hourGroup, minuteGroup } = buildHeroClockScene(THREE);
+
+      heroClock3D = { renderer, scene, camera, texture, sphere, hourGroup, minuteGroup, width: 0, height: 0 };
+
+      heroClock.classList.add('is-webgl');
+      renderHeroClock3D();
+      updateHeroClockVisual();
+      initOrbitRingsClock3D(THREE);
+    } catch (error) {
+      console.warn('Unable to initialize the hero clock sphere.', error);
+      heroClock.classList.add('is-unavailable');
+    }
+  }
+
+  function initOrbitRingsClock3D(THREE) {
+    const canvas = document.querySelector('.orbit-rings-canvas');
+    const el = document.querySelector('.orbit-rings-clock');
+    if (!canvas || !el) return;
+    try {
+      const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'default', preserveDrawingBuffer: true });
+      renderer.setClearColor(0x000000, 0);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100);
+      camera.position.z = 9.15;
+
+      // Circular rings — start edge-on at 2am angles, spread apart to form a heart together
+      const hourGroup = new THREE.Group();
+      const hourRing = makeOrbitEllipseTube(THREE, 0.86, 1.58, 0.0038, 0xf4a8c8, 0.46);
+      hourRing.rotation.x = Math.PI / 2 - 0.14;
+      hourRing.rotation.y = 0.06;
+      hourGroup.rotation.z = -(330 * Math.PI / 180);
+      hourGroup.add(hourRing);
+
+      const minuteGroup = new THREE.Group();
+      const minuteRing = makeOrbitEllipseTube(THREE, 1.1, 2.0, 0.0033, 0xd8c0ff, 0.56);
+      minuteRing.rotation.x = Math.PI / 2 - 0.06;
+      minuteRing.rotation.y = -0.04;
+      minuteGroup.rotation.z = -(1710 * Math.PI / 180);
+      minuteGroup.add(minuteRing);
+
+      scene.add(hourGroup, minuteGroup);
+      orbitRings3D = { renderer, scene, camera, el, hourGroup, minuteGroup, width: 0, height: 0 };
+    } catch (e) {
+      console.warn('Unable to initialize orbit rings clock.', e);
+    }
+  }
+
+  function renderOrbitRings3D(orbitProg = 0) {
+    if (!orbitRings3D) return;
+    const { renderer, scene, camera, hourGroup, minuteGroup } = orbitRings3D;
+
+    // Seamless handoff from hero clock: START_SCALE makes orbit rings appear at the same
+    // visual size as the hero clock rings (hour r=1.58, minute r=2.04) at orbitProg=0.
+    // Tube radii are pre-divided by START_SCALE so apparent thickness stays consistent.
+    // HEART_D per ring = rY * sin(TILT) so each ring's bottom tip converges at x=0.
+    const START_SCALE  = 1.85;
+    const HEART_H      = 0.18;
+    const HEART_TILT   = 0.52;
+    const HEART_D_H    = 1.58 * Math.sin(HEART_TILT); // pink (hour) left lobe  ≈ 0.785
+    const HEART_D_M    = 2.0  * Math.sin(HEART_TILT); // purple (minute) right lobe ≈ 0.994
+
+    const HOUR_Z_START   = -(330 * Math.PI / 180);
+    const MINUTE_Z_START = -(1710 * Math.PI / 180);
+
+    const groupScale = lerp(START_SCALE, 1, orbitProg);
+
+    if (hourGroup) {
+      // pink (hour) ring → left lobe
+      hourGroup.position.set(
+        lerp(0, -HEART_D_H, orbitProg),
+        lerp(0, HEART_H, orbitProg),
+        0,
+      );
+      hourGroup.rotation.z = lerp(HOUR_Z_START, +HEART_TILT, orbitProg);
+      hourGroup.scale.setScalar(groupScale);
+      const mH = hourGroup.children[0];
+      if (mH) {
+        mH.rotation.x = lerp(Math.PI / 2 - 0.14, 0, orbitProg); // edge-on → face-on
+        mH.rotation.y = lerp(0.06, 0, orbitProg);
+      }
+    }
+    if (minuteGroup) {
+      // purple (minute) ring → right lobe
+      minuteGroup.position.set(
+        lerp(0, HEART_D_M, orbitProg),
+        lerp(0, HEART_H, orbitProg),
+        0,
+      );
+      minuteGroup.rotation.z = lerp(MINUTE_Z_START, -HEART_TILT, orbitProg);
+      minuteGroup.scale.setScalar(groupScale);
+      const mM = minuteGroup.children[0];
+      if (mM) {
+        mM.rotation.x = lerp(Math.PI / 2 - 0.06, 0, orbitProg); // edge-on → face-on
+        mM.rotation.y = lerp(-0.04, 0, orbitProg);
+      }
+    }
+
+    const canvas = renderer.domElement;
+    const rect = canvas.getBoundingClientRect();
+    const w = Math.max(1, Math.round(rect.width));
+    const h = Math.max(1, Math.round(rect.height));
+    if (orbitRings3D.width !== w || orbitRings3D.height !== h) {
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      renderer.setPixelRatio(dpr);
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      orbitRings3D.width = w;
+      orbitRings3D.height = h;
+    }
+    renderer.render(scene, camera);
+  }
+
+  function renderOrbitRingsInSection(fitAmount, canvasLeft = whatSphereState?.left, canvasTop = whatSphereState?.top) {
+    if (!orbitRings3D || !whatSphereState) return;
+    const { renderer, scene, camera, hourGroup, minuteGroup } = orbitRings3D;
+    const { chemProgress, journalProgress } = whatSphereState;
+
+    // Resize canvas first so canvasHalf is accurate
+    const canvas = renderer.domElement;
+    const rect = canvas.getBoundingClientRect();
+    const w = Math.max(1, Math.round(rect.width));
+    const h = Math.max(1, Math.round(rect.height));
+    if (orbitRings3D.width !== w || orbitRings3D.height !== h) {
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      orbitRings3D.width = w;
+      orbitRings3D.height = h;
+    }
+    const canvasHalf = w / 2;
+
+    // sectionT: 0 = heart formation, 1 = section ring positions
+    const sectionT = smoothstep(1 - fitAmount);
+
+    const HEART_TILT = 0.52;
+    const HEART_D_H  = 1.58 * Math.sin(HEART_TILT);
+    const HEART_H    = 0.18;
+    const HEART_D_M  = 2.0  * Math.sin(HEART_TILT);
+    const ORBIT_CAM_Z = 9.15;
+    const ORBIT_TAN   = Math.tan(17 * Math.PI / 180);
+
+    // Keep kindred rings visibly centered on each star; expand later for mapped labels.
+    const compact = window.innerWidth <= 960;
+    const baseRingPx = compact ? 87 : 155;
+    const sectionRingPx = compact ? 147 : 220;
+    const RING_PX = lerp(baseRingPx, sectionRingPx, clamp(Math.max(chemProgress, journalProgress)));
+    const TARGET_R = RING_PX / canvasHalf * ORBIT_CAM_Z * ORBIT_TAN;
+
+    // Keep chemistry rings front-facing so they read as circles, not projected ellipses.
+    const PINK_RX = 0, PINK_RY = 0;
+    const PURP_RX = 0, PURP_RY = 0;
+    const CHEM_RX = 0, CHEM_RY = 0;
+    const pinkRX = lerp(PINK_RX, CHEM_RX, chemProgress);
+    const pinkRY = lerp(PINK_RY, CHEM_RY, chemProgress);
+    const purpRX = lerp(PURP_RX, CHEM_RX, chemProgress);
+    const purpRY = lerp(PURP_RY, CHEM_RY, chemProgress);
+
+    let overlapX = 0;
+    let overlapY = 0;
+    if (
+      whatSphereState.centerDot &&
+      whatSphereState.orbitDot &&
+      whatSphereState.groupWorld &&
+      whatSphereState.camera3D
+    ) {
+      whatSphereState.groupWorld.updateWorldMatrix(true, false);
+      const projectDot = (mesh) => {
+        const p = mesh.position.clone()
+          .applyMatrix4(whatSphereState.groupWorld.matrixWorld)
+          .project(whatSphereState.camera3D);
+        return {
+          x: (p.x + 1) / 2 * window.innerWidth,
+          y: (1 - p.y) / 2 * window.innerHeight,
+        };
+      };
+      const centerScreen = projectDot(whatSphereState.centerDot);
+      const orbitScreen = projectDot(whatSphereState.orbitDot);
+      const overlapScreenX = (centerScreen.x + orbitScreen.x) * 0.5;
+      const overlapScreenY = (centerScreen.y + orbitScreen.y) * 0.5;
+      const sphereScreenX = (canvasLeft / 100) * window.innerWidth;
+      const sphereScreenY = (canvasTop / 100) * window.innerHeight;
+      overlapX = (overlapScreenX - sphereScreenX) / canvasHalf * ORBIT_CAM_Z * ORBIT_TAN;
+      overlapY = -(overlapScreenY - sphereScreenY) / canvasHalf * ORBIT_CAM_Z * ORBIT_TAN;
+    }
+
+    // 1) Pink ring: heart-left → centered on pink star (orbit scene origin)
+    if (hourGroup) {
+      const pinkX = lerp(0, overlapX, chemProgress);
+      const pinkY = lerp(0, overlapY, chemProgress);
+      hourGroup.position.set(
+        lerp(-HEART_D_H, pinkX, sectionT),
+        lerp(HEART_H, pinkY, sectionT),
+        0,
+      );
+      // Non-uniform scale: ellipse → circle of TARGET_R (done before rotation)
+      hourGroup.scale.set(lerp(1, TARGET_R / 0.86, sectionT), lerp(1, TARGET_R / 1.58, sectionT), 1);
+      // Tilt on GROUP: scale creates circle first, then GROUP rotation tilts the circle → no distortion
+      hourGroup.rotation.set(
+        lerp(0, pinkRX, sectionT),
+        lerp(0, pinkRY, sectionT),
+        lerp(HEART_TILT, 0, sectionT),
+      );
+      const mH = hourGroup.children[0];
+      if (mH) mH.rotation.set(0, 0, 0); // keep mesh rotation clean
+    }
+
+    // 2) Purple ring: heart-right → centered on purple star (orbitDot screen position)
+    if (minuteGroup) {
+      let purpX = 0, purpY = 0;
+      if (whatSphereState.orbitDot && whatSphereState.groupWorld && whatSphereState.camera3D) {
+        whatSphereState.groupWorld.updateWorldMatrix(true, false);
+        const p = whatSphereState.orbitDot.position.clone()
+          .applyMatrix4(whatSphereState.groupWorld.matrixWorld)
+          .project(whatSphereState.camera3D);
+        const sphereScreenX = (canvasLeft / 100) * window.innerWidth;
+        const sphereScreenY = (canvasTop  / 100) * window.innerHeight;
+        const dotScreenX    = (p.x + 1) / 2 * window.innerWidth;
+        const dotScreenY    = (1 - p.y) / 2 * window.innerHeight;
+        purpX =  (dotScreenX - sphereScreenX) / canvasHalf * ORBIT_CAM_Z * ORBIT_TAN;
+        purpY = -(dotScreenY - sphereScreenY) / canvasHalf * ORBIT_CAM_Z * ORBIT_TAN;
+      }
+      // In chemistry: pull both rings to the center of the visible overlap.
+      purpX = lerp(purpX, overlapX, chemProgress);
+      purpY = lerp(purpY, overlapY, chemProgress);
+
+      minuteGroup.position.set(lerp(HEART_D_M, purpX, sectionT), lerp(HEART_H, purpY, sectionT), 0);
+      minuteGroup.scale.set(lerp(1, TARGET_R / 1.1, sectionT), lerp(1, TARGET_R / 2.0, sectionT), 1);
+      minuteGroup.rotation.set(
+        lerp(0, purpRX, sectionT),
+        lerp(0, purpRY, sectionT),
+        lerp(-HEART_TILT, 0, sectionT),
+      );
+      const mM = minuteGroup.children[0];
+      if (mM) {
+        mM.rotation.set(0, 0, 0);
+        mM.material.opacity = (1 - journalProgress) * 0.56;
+      }
+    }
+
+    renderer.render(scene, camera);
+  }
+
+  function updateOrbitRingsClock() {
+    if (!orbitRings3D || !sphereApproach) return;
+    const el = orbitRings3D.el;
+    const darkRoomEl = document.querySelector('.dark-room-clock');
+
+    if (!darkRoomEl || darkRoomEl._lockScrollTop == null) {
+      el.style.visibility = 'hidden';
+      return;
+    }
+
+    const scroller = document.scrollingElement || document.documentElement;
+    const scrollTop = scroller.scrollTop || 0;
+    const vh = window.innerHeight || 1;
+    const vw = window.innerWidth || 1;
+    const compact = vw <= 960;
+
+    const lockScrollTop = darkRoomEl._lockScrollTop;
+    const lockX = darkRoomEl._lockX;
+    const lockY = darkRoomEl._lockY;
+    const startSize = darkRoomEl._startSize ?? (compact ? 270 : 580);
+    const scrollDelta = scrollTop - lockScrollTop;
+
+    // orbitEnd = absolute scrollTop when sphere-approach text is centred in viewport
+    const orbitEnd = sphereApproach.offsetTop + sphereApproach.offsetHeight * 0.5 - vh * 0.5;
+    const orbitProg = smoothstep(clamp(scrollDelta / Math.max(1, orbitEnd - lockScrollTop)));
+
+    const targetSize = compact ? Math.min(vw * 0.9, 520) : Math.min(vw * 0.88, 1100);
+
+    // After orbitEnd: rings continue into sections (no fade, same element)
+    if (scrollTop >= orbitEnd) {
+      if (!whatSphereState) { el.style.visibility = 'hidden'; return; }
+      const { fitAmount, left, top, journalProgress } = whatSphereState;
+      const attachEndScroll = (whatSections[0]?.offsetTop ?? (orbitEnd + vh)) - vh * 0.08;
+      const attachRange = Math.max(1, attachEndScroll - orbitEnd);
+      const ringAttachProgress = smoothstep(clamp((scrollTop - orbitEnd) / attachRange));
+      const ringLeft = lerp(50, left, ringAttachProgress);
+      const ringTop = lerp(50, top, ringAttachProgress);
+      const ringFitAmount = lerp(1, fitAmount, ringAttachProgress);
+
+      el.style.visibility = 'visible';
+      el.style.setProperty('--ork-opacity', (1 - journalProgress * 0.5).toFixed(3));
+
+      // Let the sphere lock first; rings keep their path and attach over a short handoff.
+      el.style.setProperty('--ork-x', `${ringLeft.toFixed(2)}%`);
+      el.style.setProperty('--ork-y', `${ringTop.toFixed(2)}%`);
+
+      // Shrink canvas as rings shrink toward section size
+      const sectionSize = compact ? 480 : 980;
+      el.style.setProperty('--ork-size', `${Math.round(lerp(targetSize, sectionSize, 1 - ringFitAmount))}px`);
+
+      renderOrbitRingsInSection(ringFitAmount, ringLeft, ringTop);
+      return;
+    }
+
+    el.style.visibility = 'visible';
+    el.style.setProperty('--ork-opacity', '1');
+
+    const currentSize = Math.round(lerp(startSize, targetSize, orbitProg));
+
+    // Clamp position so the canvas never extends past the viewport edge
+    const halfXPct = (currentSize / 2 / vw) * 100;
+    const halfYPct = (currentSize / 2 / vh) * 100;
+    const clampedX = Math.max(halfXPct, Math.min(100 - halfXPct, lerp(lockX, 50, orbitProg)));
+    const clampedY = Math.max(halfYPct, Math.min(100 - halfYPct, lerp(lockY, 50, orbitProg)));
+
+    el.style.setProperty('--ork-x', `${clampedX.toFixed(2)}%`);
+    el.style.setProperty('--ork-y', `${clampedY.toFixed(2)}%`);
+    el.style.setProperty('--ork-size', `${currentSize}px`);
+
+    renderOrbitRings3D(orbitProg);
+  }
+
+  function updateDarkRoomClock() {
+    const el = document.querySelector('.dark-room-clock');
+    if (!el || !hero || !darkRoom || !sphereApproach || !heroClockCanvas || !heroClock3D) return;
+
+    const scroller = document.scrollingElement || document.documentElement;
+    const scrollTop = scroller.scrollTop || 0;
+    const vh = window.innerHeight || 1;
+    const vw = window.innerWidth || 1;
+    const compact = vw <= 960;
+
+    const heroScrollEnd = hero.offsetTop + hero.offsetHeight - vh;
+    const zoneEnd = sphereApproach.offsetTop;
+    const progress = clamp((scrollTop - heroScrollEnd) / Math.max(1, zoneEnd - heroScrollEnd));
+
+    if (progress <= 0) {
+      // Return canvas to hero if it was teleported
+      if (darkRoomClockTransiting) {
+        heroClock.appendChild(heroClockCanvas);
+        heroClockCanvas.style.cssText = '';
+        heroClock3D.width = 0;
+        heroClock3D.height = 0;
+        el.style.visibility = 'hidden';
+        el.style.setProperty('--drck-opacity', '0');
+        darkRoomClockTransiting = false;
+        // Restore hero CSS glows now that canvas is back in hero
+        if (hero) hero.classList.remove('clock-transiting');
+      }
+      // Restore sphere material and ring depthTest on scroll-up
+      if (heroClock3D?.sphere?.material?.transparent) {
+        heroClock3D.sphere.material.transparent = false;
+        heroClock3D.sphere.material.opacity = 1;
+        heroClock3D.sphere.material.needsUpdate = true;
+      }
+      // Restore ring opacity on scroll-up
+      const rH = heroClock3D?.hourGroup?.children[0];
+      const rM = heroClock3D?.minuteGroup?.children[0];
+      if (rH?.material) rH.material.opacity = 0.42;
+      if (rM?.material) rM.material.opacity = 0.52;
+      return;
+    }
+
+    // First frame after hero unsticks: teleport canvas into fixed overlay
+    if (!darkRoomClockTransiting) {
+      const cr = heroClockCanvas.getBoundingClientRect();
+      const cx = (cr.left + cr.width / 2) / vw * 100;
+      const cy = (cr.top + cr.height / 2) / vh * 100;
+      el._startX = cx;
+      el._startY = cy;
+      el._startSize = cr.width;
+
+      // Position overlay exactly over the hero clock canvas
+      el.style.setProperty('--drck-size', `${cr.width}px`);
+      el.style.setProperty('--drck-x', `${cx.toFixed(2)}%`);
+      el.style.setProperty('--drck-y', `${cy.toFixed(2)}%`);
+      el.style.setProperty('--drck-opacity', '1');
+      el.style.visibility = 'visible';
+
+      // Move canvas into overlay, fill it completely
+      el.appendChild(heroClockCanvas);
+      heroClockCanvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;';
+      heroClock3D.width = 0;
+      heroClock3D.height = 0;
+
+      darkRoomClockTransiting = true;
+      // Hide hero CSS glows so they don't paint above the sphere in dark-room-clock
+      if (hero) hero.classList.add('clock-transiting');
+    }
+
+    el.style.visibility = 'visible';
+
+    const LOCK_PROGRESS = 0.52; // progress at which 2am is reached
+
+    const startX = el._startX ?? (compact ? 50 : 80);
+    const startY = el._startY ?? (compact ? 62 : 50);
+    // keep X fixed (straight down) on both mobile and desktop
+    const endX = el._startX ?? startX;
+    const endY = compact ? 82 : 70;
+    const lineProgress = clamp(progress / LOCK_PROGRESS);
+
+    if (progress < LOCK_PROGRESS) {
+      // Animating toward 2am — restore everything in case of scroll-back from orbit phase
+      el._lockScrollTop = null;
+      if (heroClock3D?.sphere?.material?.transparent) {
+        heroClock3D.sphere.material.transparent = false;
+        heroClock3D.sphere.material.opacity = 1;
+        heroClock3D.sphere.material.needsUpdate = true;
+      }
+      // Restore orbit ring opacity and mesh rotations (in case of scroll-back)
+      const meshH0 = heroClock3D?.hourGroup?.children[0];
+      const meshM0 = heroClock3D?.minuteGroup?.children[0];
+      if (meshH0?.material) meshH0.material.opacity = 0.42;
+      if (meshM0?.material) meshM0.material.opacity = 0.52;
+      if (meshH0) { meshH0.rotation.x = Math.PI / 2 - 0.14; meshH0.rotation.y = 0.06; }
+      if (meshM0) { meshM0.rotation.x = Math.PI / 2 - 0.06; meshM0.rotation.y = -0.04; }
+
+      el.style.setProperty('--drck-x', `${lerp(startX, endX, lineProgress).toFixed(2)}%`);
+      el.style.setProperty('--drck-y', `${lerp(startY, endY, lineProgress).toFixed(2)}%`);
+      el.style.setProperty('--drck-size', `${el._startSize ?? (compact ? 270 : 580)}px`);
+      el.style.setProperty('--drck-opacity', '1');
+
+      // Clock: 9pm → 2am (still animating)
+      const clockProg = clamp(progress / LOCK_PROGRESS);
+      heroClockState.hourAngle = (270 + clockProg * 150 - 90) * (Math.PI / 180);
+      heroClockState.minuteAngle = (clockProg * 5 * 360 - 90) * (Math.PI / 180);
+      heroClockState.progress = clockProg;
+      renderHeroClock3D();
+    } else {
+      // 2am reached: sphere scrolls up with page, rings handed off to orbit-rings-clock instantly
+      if (el._lockScrollTop == null) {
+        el._lockScrollTop = scrollTop;
+        el._lockX = endX;
+        el._lockY = endY;
+        if (heroClock3D?.sphere?.material) {
+          heroClock3D.sphere.material.transparent = true;
+          heroClock3D.sphere.material.needsUpdate = true;
+        }
+      }
+
+      // Instantly hide hero rings — orbit-rings-clock shows identical-sized rings from this frame
+      const mH = heroClock3D?.hourGroup?.children[0];
+      const mM = heroClock3D?.minuteGroup?.children[0];
+      if (mH?.material) mH.material.opacity = 0;
+      if (mM?.material) mM.material.opacity = 0;
+
+      // Sphere: page-locked, scrolls up naturally
+      const scrolledY = el._lockY - ((scrollTop - el._lockScrollTop) / vh * 100);
+      el.style.setProperty('--drck-x', `${el._lockX.toFixed(2)}%`);
+      el.style.setProperty('--drck-y', `${scrolledY.toFixed(2)}%`);
+      el.style.setProperty('--drck-size', `${el._startSize ?? (compact ? 270 : 580)}px`);
+      el.style.setProperty('--drck-opacity', '1');
+
+      const halfSizePct = (el._startSize ?? 580) / vh / 2 * 100;
+      if (scrolledY < -halfSizePct) { el.style.visibility = 'hidden'; return; }
+
+      heroClockState.hourAngle = 330 * Math.PI / 180;
+      heroClockState.minuteAngle = 1710 * Math.PI / 180;
+      heroClockState.progress = 1;
+      if (heroClock3D?.sphere?.material) heroClock3D.sphere.material.opacity = 1;
+
+      renderHeroClock3D();
+      return;
+    }
+  }
+
+  function updateHeroClockVisual(scrollTop = null) {
+    if (!heroClock) return;
+
+    const rawProgress = getHeroScoreProgress(scrollTop);
+    const effectiveRawProgress = (!heroClockStartedActive && heroNightLockProgress !== null)
+      ? Math.max(rawProgress, heroNightLockProgress)
+      : rawProgress;
+    const progress = reduceMotion ? 0 : applyProgressHolds(effectiveRawProgress, HERO_NIGHT_HOLDS);
+    const minutesFromScroll = Math.round(progress * HERO_CLOCK_SCROLL_MINUTES);
+    const displayTime = new Date(heroClockBaseTime.getTime() + minutesFromScroll * 60000);
+    if (!heroClockStartedActive && displayTime.getHours() >= 21) {
+      displayTime.setHours(21, 0, 0, 0);
+    } else if (heroClockStartedActive && displayTime.getHours() >= 2 && displayTime.getHours() < 21) {
+      displayTime.setHours(2, 0, 0, 0);
+    }
+    const hours = displayTime.getHours();
+    const minutes = displayTime.getMinutes();
+    const seconds = displayTime.getSeconds();
+    const minuteAngle = ((minutes + seconds / 60) / 60) * 360;
+    const hourAngle = (((hours % 12) + minutes / 60 + seconds / 3600) / 12) * 360;
+    const timeText = formatHeroClockTime(displayTime);
+
+    isNightActive = hours >= 21 || hours < 2;
+    if (isNightActive && !heroClockStartedActive && heroNightLockProgress === null) {
+      heroNightLockProgress = rawProgress;
+    }
+    applyNightActiveState();
+
+    if (!darkRoomClockTransiting) {
+      heroClockState.progress = progress;
+      heroClockState.hourAngle = (hourAngle - 90) * (Math.PI / 180);
+      heroClockState.minuteAngle = (minuteAngle - 90) * (Math.PI / 180);
+      renderHeroClock3D();
+    }
+
+    if (heroTimeValue && heroLastTimeText !== timeText) {
+      heroTimeValue.textContent = timeText;
+      heroLastTimeText = timeText;
+    }
+
+    heroClock.setAttribute('aria-label', `current time ${timeText}`);
   }
 
   function showWaitlistMessage(text, type) {
@@ -309,7 +1148,8 @@
       slide.classList.toggle('active', isActive);
       slide.setAttribute('aria-hidden', isActive ? 'false' : 'true');
       if (isActive && slide.querySelector('.proto-chat')) triggerChatAnimation(slide);
-      if (isActive && slide.querySelector('.proto-option')) triggerOptionAnimation(slide);
+      if (isActive && slide.querySelector('.proto-voice-talk')) triggerVoiceTalkAnimation(slide);
+      if (!isActive && slide.querySelector('.proto-voice-talk')) stopVoiceTalkAnimation(slide);
     });
 
     howCopies.forEach((copy, copyIndex) => {
@@ -358,6 +1198,78 @@
         }
       }, delays[i] ?? i * 700);
       chatAnimTimers.push(t);
+    });
+  }
+
+  const LIFE_QUESTIONS = {
+    life:         "What's your top priority in life:\nmoney, love, or success?",
+    time:         "How would you spend\na perfect Sunday together?",
+    travel:       "Which do you prefer:\nbeach or mountains?",
+    relationship: "What's your biggest\ndealbreaker in a relationship?",
+    love:         "Do you believe\nin love at first sight?",
+    money:        "Do you think\nmoney can buy happiness?",
+  };
+
+  let voiceAnimTimers = [];
+  let voiceCallTimer = null;
+
+  function stopVoiceTalkAnimation(slide) {
+    voiceAnimTimers.forEach(clearTimeout);
+    voiceAnimTimers = [];
+    if (voiceCallTimer) { clearInterval(voiceCallTimer); voiceCallTimer = null; }
+    const cards = Array.from(slide.querySelectorAll('.proto-life-card'));
+    const modal = slide.querySelector('.proto-life-modal');
+    cards.forEach((c) => c.classList.remove('pressed'));
+    if (modal) modal.classList.remove('active');
+    const timerEl = slide.querySelector('.proto-voice-timer');
+    if (timerEl) timerEl.textContent = '00:00 / 40:00';
+  }
+
+  function triggerVoiceTalkAnimation(slide) {
+    stopVoiceTalkAnimation(slide);
+    const cats = ['life', 'time', 'travel', 'relationship', 'love', 'money'];
+    const modal    = slide.querySelector('.proto-life-modal');
+    const modalCat = slide.querySelector('.proto-life-modal-cat');
+    const modalQ   = slide.querySelector('.proto-life-modal-q');
+    const timerEl  = slide.querySelector('.proto-voice-timer');
+
+    // call timer
+    let elapsed = 0;
+    function fmt(s) {
+      return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+    }
+    voiceCallTimer = setInterval(() => {
+      elapsed++;
+      if (timerEl) timerEl.textContent = `${fmt(elapsed)} / 40:00`;
+    }, 1000);
+
+    // timings (ms)
+    const T_INITIAL = 2000;
+    const T_PRESS   = 100;
+    const T_RELEASE = 100;
+    const T_MODAL   = 2500;
+    const T_FADE    = 150;
+    const T_GAP     = 350;
+    const T_STEP    = T_PRESS + T_RELEASE + T_FADE + T_MODAL + T_FADE + T_GAP;
+
+    cats.forEach((cat, i) => {
+      const offset = T_INITIAL + i * T_STEP;
+      const card = slide.querySelector(`.proto-life-card[data-cat="${cat}"]`);
+
+      voiceAnimTimers.push(setTimeout(() => {
+        if (card) card.classList.add('pressed');
+      }, offset));
+
+      voiceAnimTimers.push(setTimeout(() => {
+        if (card) card.classList.remove('pressed');
+        if (modalCat) modalCat.textContent = cat;
+        if (modalQ)   modalQ.textContent   = LIFE_QUESTIONS[cat] || '';
+        if (modal)    modal.classList.add('active');
+      }, offset + T_PRESS + T_RELEASE));
+
+      voiceAnimTimers.push(setTimeout(() => {
+        if (modal) modal.classList.remove('active');
+      }, offset + T_PRESS + T_RELEASE + T_FADE + T_MODAL));
     });
   }
 
@@ -428,7 +1340,8 @@
           const index = parseInt(entry.target.dataset.howMobileIndex, 10);
           const slideEl = entry.target.querySelector('[data-how-slide]');
           if (!slideEl) return;
-          if (index === 1) triggerOptionAnimation(slideEl);
+          if (index === 0) triggerOptionAnimation(slideEl);
+          if (index === 1) triggerVoiceTalkAnimation(slideEl);
           if (index === 2) triggerChatAnimation(slideEl);
         });
       }, { threshold: 0.25 });
@@ -439,43 +1352,15 @@
     return howMobileEl;
   }
 
-  function syncHowLayout(isMobile = window.matchMedia('(max-width: 960px)').matches) {
+  function syncHowLayout() {
     if (!howNine) return;
-    if (isMobile) setupHowMobile();
-    howNine.classList.toggle('how-nine--mobile', isMobile);
-    if (!isMobile) setHowSlide(activeHowSlide);
+    setupHowMobile();
+    howNine.classList.remove('how-nine--mobile');
   }
 
   function setupHowCarousel() {
     if (!howCarousel || !howSlides.length) return;
-
-    if (!howCarouselIsBound) {
-      howPrevButtons.forEach((button) => {
-        button.addEventListener('click', () => setHowSlide(activeHowSlide - 1));
-      });
-      howNextButtons.forEach((button) => {
-        button.addEventListener('click', () => setHowSlide(activeHowSlide + 1));
-      });
-
-      howCarousel.addEventListener('keydown', (event) => {
-        if (event.key === 'ArrowLeft') setHowSlide(activeHowSlide - 1);
-        if (event.key === 'ArrowRight') setHowSlide(activeHowSlide + 1);
-      });
-
-      howCarouselIsBound = true;
-    }
-
-    const mobileQuery = window.matchMedia('(max-width: 960px)');
-    const handleHowLayoutChange = (event) => {
-      syncHowLayout(event.matches);
-      requestScrollUpdate();
-    };
-    if (mobileQuery.addEventListener) {
-      mobileQuery.addEventListener('change', handleHowLayoutChange);
-    } else {
-      mobileQuery.addListener(handleHowLayoutChange);
-    }
-    syncHowLayout(mobileQuery.matches);
+    syncHowLayout();
   }
 
   function interpolateStops(progress, stops) {
@@ -508,58 +1393,50 @@
     setSphereVar('--what-scale', state.scale);
   }
 
-  function buildOrbitRing(THREE, radiusX, radiusY, rotation, material) {
+  function buildLemniscateRing(THREE, a, rotation, material) {
     const points = [];
-    const segments = 128;
-
-    for (let index = 0; index < segments; index += 1) {
-      const theta = (Math.PI * 2 * index) / segments;
-      points.push(new THREE.Vector3(Math.cos(theta) * radiusX, Math.sin(theta) * radiusY, 0));
+    const segments = 200;
+    for (let i = 0; i <= segments; i++) {
+      const t = (Math.PI * 2 * i) / segments;
+      const denom = 1 + Math.sin(t) * Math.sin(t);
+      const x = a * Math.cos(t) / denom;
+      const y = a * Math.sin(t) * Math.cos(t) / denom;
+      points.push(new THREE.Vector3(x, y, 0));
     }
-
     const curve = new THREE.CatmullRomCurve3(points, true);
-    const geometry = new THREE.TubeGeometry(curve, 128, 0.007, 5, true);
+    const geometry = new THREE.TubeGeometry(curve, 200, 0.002, 4, true);
     const ring = new THREE.Mesh(geometry, material);
     ring.rotation.set(rotation.x, rotation.y, rotation.z);
     return ring;
   }
 
+  function buildOrbitRing(THREE, radiusX, radiusY, rotation, material) {
+    const points = [];
+    const segments = 128;
+    for (let i = 0; i < segments; i++) {
+      const t = (Math.PI * 2 * i) / segments;
+      points.push(new THREE.Vector3(Math.cos(t) * radiusX, Math.sin(t) * radiusY, 0));
+    }
+    const curve = new THREE.CatmullRomCurve3(points, true);
+    const geometry = new THREE.TubeGeometry(curve, 128, 0.002, 4, true);
+    const ring = new THREE.Mesh(geometry, material);
+    ring.rotation.set(rotation.x, rotation.y, rotation.z);
+    ring.userData.baseZ = rotation.z;
+    return ring;
+  }
+
   function buildOrbitSphere(THREE) {
     const group = new THREE.Group();
-    const orbitMaterial = new THREE.MeshBasicMaterial({
-      color: 0xf7f2ff,
+
+    const mkMat = (opacity, color = 0xf0eaff) => new THREE.MeshBasicMaterial({
+      color,
       transparent: true,
-      opacity: 0.42,
-      depthTest: true,
+      opacity,
       depthWrite: false,
-    });
-    const warmOrbitMaterial = new THREE.MeshBasicMaterial({
-      color: 0xf7f2ff,
-      transparent: true,
-      opacity: 0.28,
-      depthTest: true,
-      depthWrite: false,
-    });
-    const rings = [
-      buildOrbitRing(THREE, 1.72, 0.54, { x: 0.1, y: 0.34, z: -0.08 }, orbitMaterial),
-      buildOrbitRing(THREE, 1.58, 0.46, { x: 0.94, y: -0.16, z: 0.72 }, orbitMaterial),
-      buildOrbitRing(THREE, 1.64, 0.5, { x: -0.64, y: 0.68, z: -0.5 }, orbitMaterial),
-      buildOrbitRing(THREE, 1.4, 0.4, { x: 1.36, y: 0.2, z: -0.92 }, warmOrbitMaterial),
-      buildOrbitRing(THREE, 1.84, 0.6, { x: -0.22, y: -0.72, z: 0.36 }, orbitMaterial),
-    ];
-    rings.forEach((ring) => {
-      ring.userData.baseZ = ring.rotation.z;
-      group.add(ring);
+      blending: THREE.AdditiveBlending,
     });
 
-    const centerDot = new THREE.Mesh(
-      new THREE.SphereGeometry(0.195, 24, 24),
-      new THREE.MeshStandardMaterial({
-        color: 0xcc4477, emissive: 0xff9bdc, emissiveIntensity: 0.5,
-        roughness: 0.3, metalness: 0, transparent: true, opacity: 0, depthWrite: false,
-      }),
-    );
-    group.add(centerDot);
+    const rings = [];
 
     const ringPoint = (rX, rY, rot, theta) => {
       const p = new THREE.Vector3(Math.cos(theta) * rX, Math.sin(theta) * rY, 0);
@@ -567,87 +1444,79 @@
       return p;
     };
 
-    const placeDot = (mesh, pos) => {
-      mesh.position.copy(pos);
-      mesh.userData.to = pos.toArray();
-      mesh.userData.from = pos.clone().multiplyScalar(2.5).toArray();
-      group.add(mesh);
-    };
-
-    const orbitPos = ringPoint(1.72, 0.54, { x: 0.1, y: 0.34, z: -0.08 }, 0.8);
-    const orbitDot = new THREE.Mesh(
-      new THREE.SphereGeometry(0.15, 24, 24),
-      new THREE.MeshStandardMaterial({
-        color: 0x4833aa, emissive: 0x8b78ff, emissiveIntensity: 0.5,
-        roughness: 0.3, metalness: 0, transparent: true, opacity: 0, depthWrite: false,
+    // pink center sphere
+    const centerDot = new THREE.Mesh(
+      new THREE.SphereGeometry(0.46, 96, 96),
+      makeWhatPlanetMaterial(THREE, 0xf2d0de, {
+        r: 218,
+        g: 168,
+        b: 185,
+        noiseR: 0.72,
+        noiseG: 0.50,
+        noiseB: 0.58,
       }),
     );
-    placeDot(orbitDot, orbitPos);
+    centerDot.userData.maxOpacity = 0.74;
+    group.add(centerDot);
 
-    const STAR_PLACEMENTS = [
-      ringPoint(1.72, 0.54, { x: 0.1,   y: 0.34,  z: -0.08 }, Math.PI),
-      ringPoint(1.58, 0.46, { x: 0.94,  y: -0.16, z: 0.72  }, 0.4),
-      ringPoint(1.64, 0.50, { x: -0.64, y: 0.68,  z: -0.5  }, 2.6),
-      ringPoint(1.40, 0.40, { x: 1.36,  y: 0.20,  z: -0.92 }, 1.8),
-      ringPoint(1.84, 0.60, { x: -0.22, y: -0.72, z: 0.36  }, 5.0),
-    ];
-    const whiteDots = STAR_PLACEMENTS.map((pos) => {
-      const dot = new THREE.Mesh(
-        new THREE.SphereGeometry(0.07, 24, 24),
-        new THREE.MeshStandardMaterial({
-          color: 0xd0c8ff, emissive: 0xffffff, emissiveIntensity: 0.2,
-          roughness: 0.4, metalness: 0, transparent: true, opacity: 0, depthWrite: false,
-        }),
-      );
-      placeDot(dot, pos);
-      return dot;
-    });
-
-    const makeGlowMaterial = (colorHex) => new THREE.ShaderMaterial({
-      uniforms: {
-        uColor: { value: new THREE.Color(colorHex) },
-        uOpacity: { value: 0 },
-      },
-      vertexShader: `
-        varying vec3 vNormal;
-        varying vec3 vViewDir;
-        void main() {
-          vNormal = normalize(normalMatrix * normal);
-          vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
-          vViewDir = normalize(-mvPos.xyz);
-          gl_Position = projectionMatrix * mvPos;
-        }
-      `,
-      fragmentShader: `
-        uniform vec3 uColor;
-        uniform float uOpacity;
-        varying vec3 vNormal;
-        varying vec3 vViewDir;
-        void main() {
-          float rim = 1.0 - max(dot(vNormal, vViewDir), 0.0);
-          float alpha = uOpacity * pow(rim, 1.6);
-          gl_FragColor = vec4(uColor, alpha);
-        }
-      `,
-      transparent: true,
-      depthWrite: false,
-      side: THREE.FrontSide,
-      blending: THREE.AdditiveBlending,
-    });
-
-    const centerGlowMesh = new THREE.Mesh(
-      new THREE.SphereGeometry(0.24, 24, 24),
-      makeGlowMaterial(0xff9bdc),
+    // purple orbit sphere
+    const orbitPos = ringPoint(1.72, 0.54, { x: 0.10, y: 0.34, z: -0.08 }, 0.8);
+    const orbitDot = new THREE.Mesh(
+      new THREE.SphereGeometry(0.42, 96, 96),
+      makeWhatPlanetMaterial(THREE, 0xefe7ff, {
+        r: 220,
+        g: 207,
+        b: 255,
+        noiseR: 0.48,
+        noiseG: 0.44,
+        noiseB: 0.60,
+      }),
     );
-    centerDot.add(centerGlowMesh);
+    orbitDot.userData.maxOpacity = 0.64;
+    orbitDot.position.copy(orbitPos.clone().multiplyScalar(1.4));
+    orbitDot.userData.to   = orbitPos.clone().multiplyScalar(1.4).toArray();
+    orbitDot.userData.from = orbitPos.clone().multiplyScalar(3.5).toArray();
+    group.add(orbitDot);
 
-    const orbitGlowMesh = new THREE.Mesh(
-      new THREE.SphereGeometry(0.19, 24, 24),
-      makeGlowMaterial(0x8b78ff),
+    // small dots that orbit on the lemniscate rings
+    const lemnDotA = new THREE.Mesh(
+      new THREE.SphereGeometry(0.048, 8, 8),
+      new THREE.MeshBasicMaterial({ color: 0xff99cc, transparent: true, opacity: 0, depthWrite: false }),
     );
-    orbitDot.add(orbitGlowMesh);
+    group.add(lemnDotA);
+    const lemnDotB = new THREE.Mesh(
+      new THREE.SphereGeometry(0.048, 8, 8),
+      new THREE.MeshBasicMaterial({ color: 0xccaaff, transparent: true, opacity: 0, depthWrite: false }),
+    );
+    group.add(lemnDotB);
 
-    return { group, rings, centerDot, orbitDot, whiteDots, centerGlowMesh, orbitGlowMesh };
+    // Orbital rings for what-you-get sections (kindred / chemistry / journal)
+    const mkRingMat = (color) => new THREE.MeshBasicMaterial({
+      color, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending,
+    });
+    const makeCircleRing = (color) => {
+      const R = 0.82; const SEGS = 128;
+      const pts = [];
+      for (let i = 0; i <= SEGS; i++) {
+        const t = (Math.PI * 2 * i) / SEGS;
+        pts.push(new THREE.Vector3(Math.cos(t) * R, Math.sin(t) * R, 0));
+      }
+      const curve = new THREE.CatmullRomCurve3(pts, true);
+      const geo = new THREE.TubeGeometry(curve, SEGS, 0.003, 6, true);
+      return new THREE.Mesh(geo, mkRingMat(color));
+    };
+
+    const pinkRingGroup = new THREE.Group();
+    const pinkRingMesh = makeCircleRing(0xf4a8c8);
+    pinkRingGroup.add(pinkRingMesh);
+    group.add(pinkRingGroup);
+
+    const purpleRingGroup = new THREE.Group();
+    const purpleRingMesh = makeCircleRing(0xd8c0ff);
+    purpleRingGroup.add(purpleRingMesh);
+    group.add(purpleRingGroup);
+
+    return { group, rings, centerDot, orbitDot, whiteDots: [], centerGlowMesh: null, orbitGlowMesh: null, lemnDotA, lemnDotB, pinkRingMesh, purpleRingMesh, pinkRingGroup, purpleRingGroup };
   }
 
   function resizeWhatSphere3D() {
@@ -708,27 +1577,100 @@
       const dp = whatSphereCurrent.dotProgress;
 
       const centerEased = smoothstep(clamp(dp / 0.7));
-      whatSphere3D.centerDot.material.opacity = centerEased;
+      whatSphere3D.centerDot.material.opacity = centerEased * (whatSphere3D.centerDot.userData.maxOpacity ?? 1);
       whatSphere3D.centerDot.scale.setScalar(centerEased);
       whatSphere3D.centerDot.position.set(
         lerp(0.3, 0, centerEased),
         lerp(0.6, 0, centerEased),
         lerp(0.8, 0, centerEased),
       );
+      whatSphere3D.centerDot.rotation.x = time * 0.00018;
+      whatSphere3D.centerDot.rotation.y = -0.28 + time * 0.00012;
+      const centerTexture = whatSphere3D.centerDot.material.userData.texture;
+      if (centerTexture) {
+        centerTexture.offset.x = time * 0.000008;
+        centerTexture.offset.y = time * -0.000018;
+      }
 
       const orbitEased = smoothstep(clamp((dp - 0.2) / 0.8));
-      whatSphere3D.orbitDot.material.opacity = orbitEased;
-      whatSphere3D.orbitDot.scale.setScalar(orbitEased);
+      const orbitFade = 1 - whatSphereCurrent.journalProgress;
+      whatSphere3D.orbitDot.material.opacity = orbitEased * orbitFade * (whatSphere3D.orbitDot.userData.maxOpacity ?? 1);
+      whatSphere3D.orbitDot.scale.setScalar(orbitEased * orbitFade);
+      whatSphere3D.orbitDot.rotation.x = -0.12 + time * 0.00015;
+      whatSphere3D.orbitDot.rotation.y = 0.34 + time * 0.00011;
+      const orbitTexture = whatSphere3D.orbitDot.material.userData.texture;
+      if (orbitTexture) {
+        orbitTexture.offset.x = time * -0.000007;
+        orbitTexture.offset.y = time * -0.000014;
+      }
       const { from: oFrom, to: oTo } = whatSphere3D.orbitDot.userData;
       const chemP = whatSphereCurrent.chemProgress;
-      const CHEM_OVERLAP = [0.0, -0.24, 0.05];
+      const CHEM_OVERLAP = [0.0, 0.05, 0.55];
       whatSphere3D.orbitDot.position.set(
         lerp(lerp(oFrom[0], oTo[0], orbitEased), CHEM_OVERLAP[0], chemP),
         lerp(lerp(oFrom[1], oTo[1], orbitEased), CHEM_OVERLAP[1], chemP),
         lerp(lerp(oFrom[2], oTo[2], orbitEased), CHEM_OVERLAP[2], chemP),
       );
 
+      // ── Rings: mirror orbit-rings-clock during crossfade, then transition to sections ──
+      const kp  = whatSphereCurrent.kindredProgress;
+      const rap = whatSphereCurrent.ringAppearProgress;
+      const fa  = whatSphereCurrent.fitAmount;      // 1 at approach, 0 at kindred+
+      const op  = whatSphereCurrent.orbitProgress;  // 0→1 matching orbit-rings-clock anim
+      const ringTilt = smoothstep(clamp(dp * 1.6));  // 0=flat at approach, 1=3D at section
+
+      // Coordinate conversion: orbit-rings-clock → what-sphere local coords
+      const ORBIT_CAM_Z = 9.15;
+      const ORBIT_TAN   = 0.30573; // tan(17°)
+      const WHAT_TAN    = 0.34433; // tan(19°)
+      const orbitHalf   = Math.min(window.innerWidth * 0.88, 1100) / 2;
+      const vwHalf      = window.innerWidth  / 2;
+      const vhHalf      = window.innerHeight / 2;
+      const HEART_D_H_VAL = 1.58 * Math.sin(0.52);
+      const HEART_D_M_VAL = 2.0  * Math.sin(0.52);
+      const orbitToLocal = (ox, oy) => [
+        ox / (ORBIT_CAM_Z * ORBIT_TAN) * (orbitHalf / vwHalf) * WHAT_TAN * cameraZ / spacerScale,
+        oy / (ORBIT_CAM_Z * ORBIT_TAN) * (orbitHalf / vhHalf) * WHAT_TAN * cameraZ / spacerScale,
+      ];
+      const [pinkHX, pinkHY] = orbitToLocal(-HEART_D_H_VAL, 0.18);
+      const [purpHX, purpHY] = orbitToLocal( HEART_D_M_VAL, 0.18);
+
+      // Ring scale: match orbit-ring apparent size during approach → section size
+      const matchRingScale = (orbitRadiusY) => {
+        const localR = orbitRadiusY / (ORBIT_CAM_Z * ORBIT_TAN) * orbitHalf / vhHalf * cameraZ * WHAT_TAN / spacerScale;
+        return localR / 0.82;
+      };
+
+      // Blend factor: 0 = orbit-anim driven, 1 = section driven
+      // Switches to section formula as orbitProgress reaches 1
+      const toSection = smoothstep(clamp((op - 0.88) / 0.12));
+
+      // Pink ring
+      if (whatSphere3D.pinkRingGroup) {
+        const orbitX = lerp(0, pinkHX, op);
+        const orbitY = lerp(0, pinkHY, op);
+        const sectX  = lerp(0, pinkHX, fa);
+        const sectY  = lerp(0, pinkHY, fa);
+        whatSphere3D.pinkRingGroup.position.set(
+          lerp(orbitX, sectX, toSection),
+          lerp(orbitY, sectY, toSection),
+          0,
+        );
+      }
+      // Rings handled entirely by orbit-rings-clock — keep invisible here
+      if (whatSphere3D.pinkRingMesh)   whatSphere3D.pinkRingMesh.material.opacity   = 0;
+      if (whatSphere3D.purpleRingMesh) whatSphere3D.purpleRingMesh.material.opacity = 0;
+
+      // Pass orbitDot reference for orbit-rings-clock section positioning
+      if (whatSphereState) {
+        whatSphereState.centerDot = whatSphere3D.centerDot;
+        whatSphereState.orbitDot   = whatSphere3D.orbitDot;
+        whatSphereState.groupWorld = whatSphere3D.group;
+        whatSphereState.camera3D   = whatSphere3D.camera;
+      }
+
       if (whatSphere3D.chemOverlay) {
+        whatSphere3D.positionConstellationOverlay?.(whatSphere3D.chemOverlay);
         whatSphere3D.chemOverlay.style.opacity = chemP;
       }
 
@@ -736,25 +1678,43 @@
         whatSphere3D.centerGlowMesh.material.uniforms.uOpacity.value = whatSphereCurrent.centerGlow;
       }
       if (whatSphere3D.orbitGlowMesh) {
-        whatSphere3D.orbitGlowMesh.material.uniforms.uOpacity.value = whatSphereCurrent.orbitGlow;
+        whatSphere3D.orbitGlowMesh.material.uniforms.uOpacity.value = whatSphereCurrent.orbitGlow * orbitFade;
       }
 
+      if (whatSphere3D.kindredOverlay) {
+        whatSphere3D.kindredOverlay.style.opacity = 0;
+      }
       if (whatSphere3D.journalOverlay) {
+        whatSphere3D.positionConstellationOverlay?.(whatSphere3D.journalOverlay);
         whatSphere3D.journalOverlay.style.opacity = whatSphereCurrent.journalProgress;
       }
 
-      const STAR_STAGGER = [0.0, 0.08, 0.04, 0.12, 0.06];
-      whatSphere3D.whiteDots?.forEach((dot, i) => {
-        const { from, to } = dot.userData;
-        const t = smoothstep(clamp((dp - STAR_STAGGER[i]) / 0.7));
-        dot.material.opacity = t * 0.85;
-        dot.scale.setScalar(t);
-        dot.position.set(
-          lerp(from[0], to[0], t),
-          lerp(from[1], to[1], t),
-          lerp(from[2], to[2], t),
-        );
-      });
+      const jp = whatSphereCurrent.journalProgress;
+
+      // heart icons projected from 3D sphere centers
+      if (whatSphere3D.centerHeart && whatSphere3D.THREE) {
+        whatSphere3D.group.updateWorldMatrix(true, false);
+        const T = whatSphere3D.THREE;
+        const project = (mesh) => {
+          const p = mesh.position.clone().applyMatrix4(whatSphere3D.group.matrixWorld).project(whatSphere3D.camera);
+          return { x: (p.x * 0.5 + 0.5) * 100, y: (-p.y * 0.5 + 0.5) * 100 };
+        };
+        const heartShow = Math.max(0, (centerEased - 0.6) / 0.4) * (1 - chemP);
+        const cp = project(whatSphere3D.centerDot);
+        whatSphere3D.centerHeart.style.left = cp.x + '%';
+        whatSphere3D.centerHeart.style.top  = cp.y + '%';
+        whatSphere3D.centerHeart.style.opacity = heartShow;
+        const op2 = project(whatSphere3D.orbitDot);
+        whatSphere3D.orbitHeart.style.left = op2.x + '%';
+        whatSphere3D.orbitHeart.style.top  = op2.y + '%';
+        whatSphere3D.orbitHeart.style.opacity = heartShow * orbitFade;
+        if (whatSphere3D.chemHeart) {
+          whatSphere3D.chemHeart.style.left = `${(cp.x + op2.x) * 0.5}%`;
+          whatSphere3D.chemHeart.style.top = `${(cp.y + op2.y) * 0.5}%`;
+          whatSphere3D.chemHeart.style.opacity = chemP * centerEased;
+        }
+      }
+
     }
 
     whatSphere3D.renderer.render(whatSphere3D.scene, whatSphere3D.camera);
@@ -791,14 +1751,15 @@
         canvas: whatSphereCanvas,
         alpha: true,
         antialias: true,
-        powerPreference: 'high-performance',
+        powerPreference: 'default',
+        preserveDrawingBuffer: true,
       });
       renderer.setClearColor(0x000000, 0);
       renderer.outputColorSpace = THREE.SRGBColorSpace;
 
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
-      const { group, rings, centerDot, orbitDot, whiteDots, centerGlowMesh, orbitGlowMesh } = buildOrbitSphere(THREE);
+      const { group, rings, centerDot, orbitDot, whiteDots, centerGlowMesh, orbitGlowMesh, lemnDotA, lemnDotB, pinkRingMesh, purpleRingMesh, pinkRingGroup, purpleRingGroup } = buildOrbitSphere(THREE);
 
       scene.add(new THREE.AmbientLight(0xffffff, 1.25));
       const keyLight = new THREE.PointLight(0xff9bdc, 2.35, 7);
@@ -809,6 +1770,14 @@
       scene.add(coolLight);
       scene.add(group);
       camera.position.z = whatSphereDefault.cameraZ;
+      const makeHeartEl = () => {
+        const el = document.createElement('div');
+        el.style.cssText = 'position:absolute;pointer-events:none;transform:translate(-50%,-50%);color:rgba(255,255,255,0.82);font-size:18px;opacity:0;will-change:opacity,left,top';
+        el.textContent = '♥';
+        whatSphere.appendChild(el);
+        return el;
+      };
+
       whatSphere3D = {
         ready: true,
         renderer,
@@ -821,34 +1790,131 @@
         whiteDots,
         centerGlowMesh,
         orbitGlowMesh,
+        lemnDotA,
+        lemnDotB,
+        lemnThetaA: 0.5,
+        lemnThetaB: 3.5,
+        pinkRingMesh,
+        purpleRingMesh,
+        pinkRingGroup,
+        purpleRingGroup,
+        centerHeart: makeHeartEl(),
+        orbitHeart: makeHeartEl(),
+        chemHeart: makeHeartEl(),
+        THREE,
         focusVector: new THREE.Vector3(),
         width: 0,
         height: 0,
       };
 
-      const chemOverlay = document.createElement('div');
-      chemOverlay.className = 'chem-text-overlay';
-      chemOverlay.textContent = 'your synergy is rare. like two complementary elements, your resonance creates a stable orbit.';
-      whatSphere.appendChild(chemOverlay);
-      whatSphere3D.chemOverlay = chemOverlay;
+      const sectionRingPoint = (theta, center, radiusPx) => {
+        return {
+          dx: center.dx + Math.cos(theta) * radiusPx,
+          dy: center.dy - Math.sin(theta) * radiusPx,
+        };
+      };
 
-      const journalOverlay = document.createElement('div');
-      journalOverlay.className = 'journal-text-overlay';
-      const journalWords = [
-        { text: 'to eat',    dx: -65,  dy: -44,  size: 12 },
-        { text: 'to listen', dx:  56,  dy:  12,  size: 13.5 },
-        { text: 'to see',    dx: -46,  dy:  54,  size: 11.5 },
-        { text: 'matters',   dx:  48,  dy: -54,  size: 13 },
-      ];
-      journalWords.forEach(({ text, dx, dy, size }) => {
-        const el = document.createElement('span');
-        el.className = 'journal-word';
-        el.textContent = text;
-        el.style.cssText = `left:calc(var(--what-left) + ${dx}px);top:calc(var(--what-top) + ${dy}px);font-size:${size}px`;
-        journalOverlay.appendChild(el);
-      });
-      whatSphere.appendChild(journalOverlay);
-      whatSphere3D.journalOverlay = journalOverlay;
+      const positionConstellationOverlay = (overlay) => {
+        if (!overlay?._words) return;
+
+        const DOT_RADIUS = 7;
+        const chemP = whatSphereCurrent.chemProgress;
+        const journalP = whatSphereCurrent.journalProgress;
+        const compact = window.innerWidth <= 960;
+        const baseRingPx = compact ? 87 : 155;
+        const sectionRingPx = compact ? 147 : 220;
+        const ringRadiusPx = lerp(baseRingPx, sectionRingPx, clamp(Math.max(chemP, journalP)));
+        const baseScreen = {
+          x: (whatSphereCurrent.left / 100) * window.innerWidth,
+          y: (whatSphereCurrent.top / 100) * window.innerHeight,
+        };
+        const projectMesh = (mesh) => {
+          whatSphere3D.group.updateWorldMatrix(true, false);
+          const p = mesh.position.clone()
+            .applyMatrix4(whatSphere3D.group.matrixWorld)
+            .project(whatSphere3D.camera);
+          return {
+            x: (p.x + 1) / 2 * window.innerWidth,
+            y: (1 - p.y) / 2 * window.innerHeight,
+          };
+        };
+        const centerScreen = projectMesh(whatSphere3D.centerDot);
+        const orbitScreen = projectMesh(whatSphere3D.orbitDot);
+        const centerDotRel = {
+          dx: centerScreen.x - baseScreen.x,
+          dy: centerScreen.y - baseScreen.y,
+        };
+        const overlapRel = {
+          dx: (centerScreen.x + orbitScreen.x) * 0.5 - baseScreen.x,
+          dy: (centerScreen.y + orbitScreen.y) * 0.5 - baseScreen.y,
+        };
+        const ringCenters = {
+          chemistry: {
+            dx: lerp(centerDotRel.dx, overlapRel.dx, chemP),
+            dy: lerp(centerDotRel.dy, overlapRel.dy, chemP),
+          },
+          journal: centerDotRel,
+        };
+
+        overlay._words.forEach((word) => {
+          let dx = word.dx;
+          let dy = word.dy;
+          const anchorRight = word.side === 'right' || (word.side === 'compact-right' && compact);
+          if (Number.isFinite(word.theta) && ringCenters[word.ring]) {
+            const point = sectionRingPoint(word.theta, ringCenters[word.ring], ringRadiusPx);
+            dx = point.dx + (word.dotAnchor ? (anchorRight ? DOT_RADIUS : -DOT_RADIUS) : 0);
+            dy = point.dy;
+          }
+          if (word.dotAnchor) {
+            word.el.style.transform = anchorRight ? 'translate(-100%,-50%)' : 'translate(0,-50%)';
+            word.el.style.flexDirection = anchorRight ? 'row-reverse' : 'row';
+          }
+          word.el.style.left = `calc(var(--what-left) + ${dx.toFixed(2)}px)`;
+          word.el.style.top = `calc(var(--what-top) + ${dy.toFixed(2)}px)`;
+        });
+      };
+
+      const makeConstellationOverlay = (words) => {
+        const wrap = document.createElement('div');
+        wrap.className = 'constellation-overlay';
+        wrap._words = [];
+        words.forEach(({ text, dx = 0, dy = 0, theta, ring, color, size, dotAnchor, side }) => {
+          const el = document.createElement('span');
+          el.className = `constellation-word dot-${color}`;
+          el.textContent = text;
+          // dotAnchor: position text edge so the matte dot center lands on the ring.
+          const transform = dotAnchor ? 'translate(0,-50%)' : 'translate(-50%,-50%)';
+          el.style.cssText = `left:calc(var(--what-left) + ${dx}px);top:calc(var(--what-top) + ${dy}px);font-size:${size}px;transform:${transform}`;
+          wrap.appendChild(el);
+          wrap._words.push({ el, dx, dy, theta, ring, dotAnchor, side });
+        });
+        whatSphere.appendChild(wrap);
+        positionConstellationOverlay(wrap);
+        return wrap;
+      };
+
+      whatSphere3D.kindredOverlay = makeConstellationOverlay([
+        { text: 'drawn together',    dx: -112, dy: -70, color: 'purple', size: 11.5 },
+        { text: 'same frequency',    dx:  68,  dy: -56, color: 'pink',   size: 11   },
+        { text: 'quiet recognition', dx: -96,  dy:  66, color: 'purple', size: 11   },
+      ]);
+
+      whatSphere3D.chemOverlay = makeConstellationOverlay([
+        { text: 'shared values',    theta: Math.PI / 2, ring: 'chemistry', color: 'pink',   size: 12.5, dotAnchor: true },
+        { text: 'gentle humor',     theta: 3.70,        ring: 'chemistry', color: 'purple', size: 12,   dotAnchor: true },
+        { text: 'late-night talks', theta: 5.60,        ring: 'chemistry', color: 'pink',   size: 12,   dotAnchor: true, side: 'compact-right' },
+      ]);
+      // wire chem to chemProgress via direct property
+      whatSphere3D.chemOverlay._isChem = true;
+
+      whatSphere3D.journalOverlay = makeConstellationOverlay([
+        { text: 'to listen',    theta: 2.35, ring: 'journal', color: 'purple', size: 12.5, dotAnchor: true },
+        { text: 'to laugh',     theta: 0.75, ring: 'journal', color: 'pink',   size: 13,   dotAnchor: true, side: 'compact-right' },
+        { text: 'to notice',    theta: 3.78, ring: 'journal', color: 'purple', size: 12,   dotAnchor: true },
+        { text: 'what matters', theta: 5.55, ring: 'journal', color: 'pink',   size: 13,   dotAnchor: true, side: 'compact-right' },
+      ]);
+
+      whatSphere3D.positionConstellationOverlay = positionConstellationOverlay;
 
       resizeWhatSphere3D();
       renderWhatSphere3D();
@@ -881,9 +1947,7 @@
       { at: pChemistry, radius: compact ? 0.065 : 0.052, strength: 0.72 },
       { at: pJournal, radius: compact ? 0.07 : 0.056, strength: 0.76 },
     ]);
-    const heldScrollTop = start + heldProgress * Math.max(1, end - start);
     const sphereProgress = Math.min(heldProgress, pJournal);
-    const journalScrollLift = (Math.max(0, heldScrollTop - whatSections[2].offsetTop) / vh) * 100;
     const approachTop = viewportTopFor(sphereApproach, 0.5);
     const approachTopAtTransition = sphereApproach.offsetHeight * 0.5 / vh * 100;
     const introEnd = Math.max(0.0001, pApproach * 0.8);
@@ -894,37 +1958,51 @@
       [introEnd, 1],
       [1, 1],
     ]);
-    const left = compact ? 50 : interpolateStops(sphereProgress, [
-      [0, 50],
-      [pApproach, 50],
-      [pKindred, 72],
-      [pChemistry, 28],
-      [pJournalBreath, 50],
-      [pJournal, 68],
-      [1, 68],
-    ]);
-    const baseTop = progress <= pApproach
+    const fixedVideoSwitch = (from, to, width = compact ? 0.18 : 0.13) => {
+      const mid = lerp(from, to, 0.5);
+      const span = Math.max(0.0001, (to - from) * width);
+      return smoothstep(clamp((sphereProgress - (mid - span)) / (span * 2)));
+    };
+    const approachToKindred = fixedVideoSwitch(pApproach, pKindred, compact ? 0.24 : 0.2);
+    const kindredToChemistry = fixedVideoSwitch(pKindred, pChemistry);
+    const chemistryToJournal = fixedVideoSwitch(pChemistry, pJournal);
+    const sectionLeft = compact
+      ? lerp(lerp(35, 43, kindredToChemistry), 50, chemistryToJournal)
+      : lerp(lerp(65, 28, kindredToChemistry), 72, chemistryToJournal);
+    const sectionTop = compact ? 72 : 52;
+    const left = progress <= pApproach
+      ? 50
+      : lerp(50, sectionLeft, approachToKindred);
+    const top = progress <= pApproach
       ? approachTop
-      : (compact
-        ? interpolateStops(sphereProgress, [[pApproach, approachTopAtTransition], [pKindred, 70], [pChemistry, 74], [pJournalBreath, 72], [pJournal, 68], [1, 68]])
-        : interpolateStops(sphereProgress, [[pApproach, approachTopAtTransition], [pKindred, 51], [pChemistry, 50], [pJournalBreath, 54], [pJournal, 52], [1, 52]]));
-    const top = baseTop - journalScrollLift;
-    const scale = compact
-      ? interpolateStops(sphereProgress, [[0, 1.12], [pApproach, 1.12], [pKindred, 0.9], [pChemistry, 1.02], [pJournalBreath, 0.72], [pJournal, 1.02], [1, 1.02]])
-      : interpolateStops(sphereProgress, [[0, 1.18], [pApproach, 1.18], [pKindred, 0.96], [pChemistry, 1.06], [pJournalBreath, 0.78], [pJournal, 1.04], [1, 1.04]]);
-    const depth = compact
-      ? interpolateStops(sphereProgress, [[0, 1.2], [pApproach, 1.2], [pKindred, 1.02], [pChemistry, 1.16], [pJournalBreath, 0.82], [pJournal, 1.12], [1, 1.12]])
-      : interpolateStops(sphereProgress, [[0, 1.26], [pApproach, 1.26], [pKindred, 1.06], [pChemistry, 1.2], [pJournalBreath, 0.88], [pJournal, 1.16], [1, 1.16]]);
+      : lerp(approachTopAtTransition, sectionTop, approachToKindred);
+    const journalScrollLift = (Math.max(0, scrollTop - whatSections[2].offsetTop) / vh) * 100;
+    const journalTopOffset = compact ? 0 : lerp(0, 8, chemistryToJournal);
+    const releasedTop = top + journalTopOffset - journalScrollLift;
+    const scale = compact ? 0.98 : 1.02;
+    const depth = compact ? 1.08 : 1.12;
     const fitAmount = interpolateStops(sphereProgress, [[0, 1], [pApproach, 1], [pKindred, 0], [pJournal, 0], [1, 0]]);
-    const rotationX = interpolateStops(sphereProgress, [[0, -0.1], [pApproach, -0.1], [pKindred, 0.04], [pChemistry, -0.16], [pJournalBreath, 0.02], [pJournal, 0.16], [1, 0.16]]);
+    const rotationX = interpolateStops(sphereProgress, [[0, -0.1], [pApproach, -0.1], [pKindred, 0.04], [pChemistry, -0.04], [pJournal, 0.08], [1, 0.08]]);
     const rotationY = interpolateStops(sphereProgress, [[0, -0.34], [pApproach, -0.34], [pKindred, 0.54], [pChemistry, 1.38], [pJournalBreath, 1.62], [pJournal, 2.1], [1, 2.1]]);
-    const rotationZ = interpolateStops(sphereProgress, [[0, 0.06], [pApproach, 0.06], [pKindred, 0.04], [pChemistry, -0.1], [pJournalBreath, 0.08], [pJournal, 0.04], [1, 0.04]]);
-    const cameraZ = compact
-      ? interpolateStops(sphereProgress, [[0, 4.92], [pApproach, 4.92], [pKindred, 5.7], [pChemistry, 5.3], [pJournalBreath, 6.4], [pJournal, 5.3], [1, 5.3]])
-      : interpolateStops(sphereProgress, [[0, 4.84], [pApproach, 4.84], [pKindred, 5.42], [pChemistry, 5], [pJournalBreath, 6.2], [pJournal, 5], [1, 5]]);
+    const rotationZ = progress <= pApproach ? 0.06 : 0.04;
+    const cameraZ = lerp(whatSphereDefault.cameraZ, compact ? 5.35 : 5.12, approachToKindred);
 
     const dotAnimStart = lerp(pApproach, pKindred, 0.35);
     const dotProgress = clamp((sphereProgress - dotAnimStart) / Math.max(0.0001, pKindred - dotAnimStart));
+
+    // orbitProgress: mirrors orbit-rings-clock animation (0→1 from lockScrollTop to orbitEnd)
+    const orbitEnd = sphereApproach.offsetTop + sphereApproach.offsetHeight * 0.5 - vh * 0.5;
+    const darkRoomClockEl = document.querySelector('.dark-room-clock');
+    const lockST = darkRoomClockEl?._lockScrollTop ?? null;
+    const localOrbitProg = lockST !== null
+      ? smoothstep(clamp((scrollTop - lockST) / Math.max(1, orbitEnd - lockST)))
+      : 0;
+
+    // Crossfade: rings appear as orbit-rings-clock fades (same 0.38vh window)
+    const CROSS_VH_PROG = 0.38 * vh / Math.max(1, end - start);
+    const handoffP = clamp((orbitEnd - start) / Math.max(1, end - start));
+    const crossStartP = Math.max(0, handoffP - CROSS_VH_PROG);
+    const ringAppearProgress = smoothstep(clamp((sphereProgress - crossStartP) / Math.max(0.0001, handoffP - crossStartP)));
 
     // kindred: orbit(보라)만 글로우
     const kindredGlowIn = clamp((sphereProgress - lerp(pApproach, pKindred, 0.4)) / Math.max(0.0001, pKindred - lerp(pApproach, pKindred, 0.4)));
@@ -942,10 +2020,14 @@
     const chemOut = 1 - clamp((sphereProgress - chemOutStart) / Math.max(0.0001, chemOutEnd - chemOutStart));
     const chemProgress = smoothstep(clamp(Math.min(chemIn, chemOut)));
 
+    const kindredIn  = clamp((sphereProgress - lerp(pApproach, pKindred, 0.5)) / Math.max(0.0001, pKindred - lerp(pApproach, pKindred, 0.5)));
+    const kindredOut = 1 - clamp((sphereProgress - lerp(pKindred, pChemistry, 0.2)) / Math.max(0.0001, lerp(pKindred, pChemistry, 0.45) - lerp(pKindred, pChemistry, 0.2)));
+    const kindredProgress = smoothstep(clamp(Math.min(kindredIn, kindredOut)));
+
     setWhatSphere3DTarget({
       opacity: sphereOpacity,
       left,
-      top,
+      top: releasedTop,
       scale,
       depth,
       fitAmount,
@@ -958,10 +2040,28 @@
       cameraZ,
       dotProgress,
       chemProgress,
-      centerGlow: Math.max(chemProgress, journalCenterGlow),
-      orbitGlow: Math.max(kindredOrbitGlow, chemProgress),
+      centerGlow: 0,
+      orbitGlow: 0,
+      kindredProgress,
       journalProgress: journalCenterGlow,
+      ringAppearProgress,
+      orbitProgress: localOrbitProg,
     });
+
+    // Keep orbit-rings-clock updated for section phase
+    whatSphereState = {
+      fitAmount,
+      left,
+      top: releasedTop,
+      kindredProgress,
+      chemProgress,
+      journalProgress: journalCenterGlow,
+      dotProgress,
+      compact,
+      orbitEnd,
+    };
+
+    renderWhatSphere3D();
   }
 
   function updateDarkRoom() {
@@ -994,8 +2094,11 @@
     const maxScroll = Math.max(1, scroller.scrollHeight - window.innerHeight);
     latestProgress = clamp(scrollTop / maxScroll);
 
+    updateHeroClockVisual(scrollTop);
     updateHeroScoreVisual(scrollTop);
+    updateDarkRoomClock();
     updateWhatSphere();
+    updateOrbitRingsClock();
     updateDarkRoom();
   }
 
@@ -1013,6 +2116,8 @@
       requestScrollUpdate();
     }, 120);
   });
+  initHeroTimeGate();
+  initHeroClock3D();
   initWhatSphere3D();
   setupWaitlistForm();
   setupHowCarousel();
