@@ -1759,7 +1759,7 @@
         <h2>meet your kindred</h2>
         <p>no swiping, no endless seraching. just one conversation at a time, until someone starts to feel familiar.</p>
       </div>
-      <div class="story-visual what-sphere-slot reveal d1" aria-hidden="true"></div>
+      <div class="story-visual what-sphere-slot" aria-hidden="true"></div>
     </div>
   </div>
 </section>
@@ -1772,7 +1772,7 @@
         <h2>chemistry, softly mapped</h2>
         <p>after each call, coco traces where your worlds overlap - the little rhythms, values, and moments that felt mutual.</p>
       </div>
-      <div class="story-visual what-sphere-slot reveal d1" aria-hidden="true"></div>
+      <div class="story-visual what-sphere-slot" aria-hidden="true"></div>
     </div>
   </div>
 </section>
@@ -1785,7 +1785,7 @@
         <h2>self journaling</h2>
         <p>every conversation reveals a little more of you. explore what you love and what kind of connection keeps glowing.</p>
       </div>
-      <div class="story-visual what-sphere-slot reveal d1" aria-hidden="true"></div>
+      <div class="story-visual what-sphere-slot" aria-hidden="true"></div>
     </div>
   </div>
 </section>
@@ -1803,10 +1803,10 @@
 <!-- ─── HOW NINE WORKS ─── -->
 <section class="how-nine" id="how">
   <div class="container">
-    <div class="how-nine-inner reveal">
+    <div class="how-nine-inner">
       <div class="how-work-shell" data-how-carousel="">
         <div class="how-work-layout">
-          <div class="how-phone-stage">
+          <div class="how-phone-stage reveal d1">
             <button class="how-phone-nav prev" type="button" data-how-prev="" aria-label="previous step" title="previous step">←</button>
             <div class="phone how-work-phone">
               <div class="how-phone-screens">
@@ -1982,7 +1982,7 @@
             <button class="how-phone-nav next" type="button" data-how-next="" aria-label="next step" title="next step">→</button>
           </div>
 
-          <div class="how-copy-stack">
+          <div class="how-copy-stack reveal d2">
             <div class="how-work-copy active" data-how-copy="" aria-hidden="false">
               <h3>five, chosen for you</h3>
               <p>at about nine, five people curated by ai. not a deck to swipe.</p>
@@ -2056,19 +2056,35 @@
   // Scroll reveal via IntersectionObserver
   (function(){
     const reveal = (el) => el.classList.add('in');
-    if (!('IntersectionObserver' in window)) {
-      document.querySelectorAll('.reveal').forEach(reveal);
-      return;
-    }
-    const io = new IntersectionObserver((entries, obs) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          reveal(entry.target);
-          obs.unobserve(entry.target);
-        }
+    const collect = (target) => {
+      if (!target) return [];
+      if (target.matches?.('.reveal')) return [target];
+      return Array.from(target.querySelectorAll?.('.reveal') || []);
+    };
+    let io = null;
+
+    window.observeReveal = function(target = document) {
+      const elements = collect(target);
+      if (!('IntersectionObserver' in window)) {
+        elements.forEach(reveal);
+        return;
+      }
+      if (!io) {
+        io = new IntersectionObserver((entries, obs) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              reveal(entry.target);
+              obs.unobserve(entry.target);
+            }
+          });
+        }, { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
+      }
+      elements.forEach(el => {
+        if (!el.classList.contains('in')) io.observe(el);
       });
-    }, { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
-    document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+    };
+
+    window.observeReveal(document);
   })();
 </script>
 

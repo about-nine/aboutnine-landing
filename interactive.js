@@ -558,6 +558,9 @@
     // A point on the sphere surface traces (0, -r·sinθ, r·cosθ) as the sphere pitches by θ
     if (heroClock3D.textPlane) {
       const r = 1.36;
+      const compactText = window.innerWidth <= 960;
+      const narrowText = window.innerWidth <= 600;
+      heroClock3D.textPlane.scale.set(narrowText ? 0.48 : (compactText ? 0.64 : 1), narrowText ? 0.58 : (compactText ? 0.72 : 1), 1);
       heroClock3D.textPlane.visible = !textLocked;
       if (textLocked) {
         heroClock3D.textPlane.position.set(0, 0, r);
@@ -604,7 +607,9 @@
 
         const fontFamily = getComputedStyle(root).getPropertyValue('--font-brand').trim().replace(/"/g, '') || 'system-ui, sans-serif';
         // Measure at target size, scale down if text overflows canvas
-        let fontSize = 128;
+        const compactText = window.innerWidth <= 960;
+        const narrowText = window.innerWidth <= 600;
+        let fontSize = narrowText ? 104 : (compactText ? 116 : 128);
         ctx.font = `600 ${fontSize}px ${fontFamily}`;
         const testWidth = ctx.measureText('Meet your match').width;
         if (testWidth > W * 0.96) fontSize = Math.floor(fontSize * (W * 0.96) / testWidth);
@@ -935,8 +940,9 @@
       const ringTop = lerp(50, top, ringAttachProgress);
       const ringFitAmount = lerp(1, fitAmount, ringAttachProgress);
 
-      el.style.visibility = 'visible';
-      el.style.setProperty('--ork-opacity', (1 - journalProgress * 0.5).toFixed(3));
+      const externalRingOpacity = (1 - journalProgress * 0.5) * (1 - ringAttachProgress);
+      el.style.visibility = externalRingOpacity > 0.02 ? 'visible' : 'hidden';
+      el.style.setProperty('--ork-opacity', externalRingOpacity.toFixed(3));
 
       // Let the sphere lock first; rings keep their path and attach over a short handoff.
       el.style.setProperty('--ork-x', `${ringLeft.toFixed(2)}%`);
@@ -953,11 +959,10 @@
     el.style.visibility = 'visible';
     el.style.setProperty('--ork-opacity', '1');
 
-    // Canvas position uses the full orbitProg so rings move smoothly toward section.
-    const EXIT_X = compact ? 10 : 13;
-    const EXIT_Y = compact ? 2 : 3;
-    const posX = lerp(lockX + EXIT_X, 50, orbitProg);
-    const posY = lerp(lockY + EXIT_Y, 50, orbitProg);
+    const startX = darkRoomEl._orbitStartX ?? lockX;
+    const startY = darkRoomEl._orbitStartY ?? lockY;
+    const posX = lerp(startX, 50, orbitProg);
+    const posY = lerp(startY, 50, orbitProg);
 
     // Geometry animates throughout the full travel — no delay.
     // Power easing (x^1.5) makes the initial rotation gradual so rings visibly turn
@@ -1066,6 +1071,9 @@
       if (meshH0) { meshH0.rotation.x = Math.PI / 2 - 0.14; meshH0.rotation.y = 0.06; }
       if (meshM0) { meshM0.rotation.x = Math.PI / 2 - 0.06; meshM0.rotation.y = -0.04; }
       el._ringExitScrollEnd = null;
+      el._orbitStartX = null;
+      el._orbitStartY = null;
+      el._orbitStartFrozen = false;
       if (heroClock3D?.hourGroup) heroClock3D.hourGroup.position.set(0, 0, 0);
       if (heroClock3D?.minuteGroup) heroClock3D.minuteGroup.position.set(0, 0, 0);
 
@@ -1089,23 +1097,14 @@
         el._lockX = endX;
         el._lockY = endY;
         el._ringExitScrollEnd = scrollTop + RING_EXIT_SCROLL;
+        el._orbitStartFrozen = false;
         if (heroClock3D?.sphere?.material) {
           heroClock3D.sphere.material.transparent = true;
           heroClock3D.sphere.material.needsUpdate = true;
         }
       }
 
-      // Slide rings toward lower-right at FULL opacity — no fade, purely physical exit.
-      // Rings are hidden only once they've cleared the sphere, when orbit-rings-clock takes over.
-      const ringExitProg = smoothstep(clamp((scrollTop - el._lockScrollTop) / RING_EXIT_SCROLL));
-      const mH = heroClock3D?.hourGroup?.children[0];
-      const mM = heroClock3D?.minuteGroup?.children[0];
-      if (heroClock3D?.hourGroup) heroClock3D.hourGroup.position.set(ringExitProg * 1.8, ringExitProg * -1.0, 0);
-      if (heroClock3D?.minuteGroup) heroClock3D.minuteGroup.position.set(ringExitProg * 1.8, ringExitProg * -1.0, 0);
-      if (mH?.material) mH.material.opacity = ringExitProg < 1 ? 0.42 : 0;
-      if (mM?.material) mM.material.opacity = ringExitProg < 1 ? 0.52 : 0;
-
-      // Sphere: page-locked, scrolls up naturally
+      // Sphere canvas position must be current before projecting the exiting rings.
       const scrolledY = el._lockY - ((scrollTop - el._lockScrollTop) / vh * 100);
       el.style.setProperty('--drck-x', `${el._lockX.toFixed(2)}%`);
       el.style.setProperty('--drck-y', `${scrolledY.toFixed(2)}%`);
@@ -1114,6 +1113,34 @@
 
       const halfSizePct = (el._startSize ?? 580) / vh / 2 * 100;
       if (scrolledY < -halfSizePct) { el.style.visibility = 'hidden'; return; }
+
+      // Slide rings toward lower-right at FULL opacity — no fade, purely physical exit.
+      // Rings are hidden only once they've cleared the sphere, when orbit-rings-clock takes over.
+      const ringExitProg = smoothstep(clamp((scrollTop - el._lockScrollTop) / RING_EXIT_SCROLL));
+      const mH = heroClock3D?.hourGroup?.children[0];
+      const mM = heroClock3D?.minuteGroup?.children[0];
+      if (heroClock3D?.hourGroup) heroClock3D.hourGroup.position.set(ringExitProg * 1.8, ringExitProg * -1.0, 0);
+      if (heroClock3D?.minuteGroup) heroClock3D.minuteGroup.position.set(ringExitProg * 1.8, ringExitProg * -1.0, 0);
+      if (!el._orbitStartFrozen && heroClock3D?.hourGroup && heroClock3D?.minuteGroup && heroClock3D?.camera) {
+        const ringCenter = heroClock3D.hourGroup.position.clone()
+          .lerp(heroClock3D.minuteGroup.position, 0.5)
+          .project(heroClock3D.camera);
+        const handoffSize = el._startSize ?? (compact ? 270 : 580);
+        const handoffY = el._lockY - (RING_EXIT_SCROLL / vh) * 100;
+        const overlayRect = ringExitProg >= 0.999
+          ? {
+              left: (el._lockX / 100) * vw - handoffSize / 2,
+              top: (handoffY / 100) * vh - handoffSize / 2,
+              width: handoffSize,
+              height: handoffSize,
+            }
+          : el.getBoundingClientRect();
+        el._orbitStartX = ((overlayRect.left + (ringCenter.x * 0.5 + 0.5) * overlayRect.width) / vw) * 100;
+        el._orbitStartY = ((overlayRect.top + (-ringCenter.y * 0.5 + 0.5) * overlayRect.height) / vh) * 100;
+        if (ringExitProg >= 0.999) el._orbitStartFrozen = true;
+      }
+      if (mH?.material) mH.material.opacity = ringExitProg < 1 ? 0.42 : 0;
+      if (mM?.material) mM.material.opacity = ringExitProg < 1 ? 0.52 : 0;
 
       heroClockState.hourAngle = 330 * Math.PI / 180;
       heroClockState.minuteAngle = 1710 * Math.PI / 180;
@@ -1448,13 +1475,13 @@
 
       if (copy) {
         const copyDiv = document.createElement('div');
-        copyDiv.className = 'how-mobile-copy';
+        copyDiv.className = 'how-mobile-copy reveal';
         copyDiv.innerHTML = copy.innerHTML;
         item.appendChild(copyDiv);
       }
 
       const phoneWrap = document.createElement('div');
-      phoneWrap.className = 'how-mobile-phone-wrap';
+      phoneWrap.className = 'how-mobile-phone-wrap reveal d1';
       const phone = document.createElement('div');
       phone.className = 'phone how-mobile-phone';
       const screens = document.createElement('div');
@@ -1472,6 +1499,7 @@
 
     howCarousel.after(mobileEl);
     howMobileEl = mobileEl;
+    window.observeReveal?.(mobileEl);
 
     if ('IntersectionObserver' in window) {
       const mobileObserver = new IntersectionObserver((entries) => {
@@ -1745,61 +1773,45 @@
       }
       const { from: oFrom, to: oTo } = whatSphere3D.orbitDot.userData;
       const chemP = whatSphereCurrent.chemProgress;
+      const compact = window.innerWidth <= 960;
+      const mobileOrbitTighten = compact ? lerp(0.74, 1, chemP) : 1;
       const CHEM_OVERLAP = [0.0, 0.05, 0.55];
       whatSphere3D.orbitDot.position.set(
-        lerp(lerp(oFrom[0], oTo[0], orbitEased), CHEM_OVERLAP[0], chemP),
-        lerp(lerp(oFrom[1], oTo[1], orbitEased), CHEM_OVERLAP[1], chemP),
+        lerp(lerp(oFrom[0], oTo[0], orbitEased) * mobileOrbitTighten, CHEM_OVERLAP[0], chemP),
+        lerp(lerp(oFrom[1], oTo[1], orbitEased) * mobileOrbitTighten, CHEM_OVERLAP[1], chemP),
         lerp(lerp(oFrom[2], oTo[2], orbitEased), CHEM_OVERLAP[2], chemP),
       );
 
-      // ── Rings: mirror orbit-rings-clock during crossfade, then transition to sections ──
-      const kp  = whatSphereCurrent.kindredProgress;
-      const rap = whatSphereCurrent.ringAppearProgress;
-      const fa  = whatSphereCurrent.fitAmount;      // 1 at approach, 0 at kindred+
-      const op  = whatSphereCurrent.orbitProgress;  // 0→1 matching orbit-rings-clock anim
-      const ringTilt = smoothstep(clamp(dp * 1.6));  // 0=flat at approach, 1=3D at section
+      const kp = whatSphereCurrent.kindredProgress;
 
-      // Coordinate conversion: orbit-rings-clock → what-sphere local coords
-      const ORBIT_CAM_Z = 9.15;
-      const ORBIT_TAN   = 0.30573; // tan(17°)
-      const WHAT_TAN    = 0.34433; // tan(19°)
-      const orbitHalf   = Math.min(window.innerWidth * 0.88, 1100) / 2;
-      const vwHalf      = window.innerWidth  / 2;
-      const vhHalf      = window.innerHeight / 2;
-      const HEART_D_H_VAL = 1.58 * Math.sin(0.52);
-      const HEART_D_M_VAL = 2.0  * Math.sin(0.52);
-      const orbitToLocal = (ox, oy) => [
-        ox / (ORBIT_CAM_Z * ORBIT_TAN) * (orbitHalf / vwHalf) * WHAT_TAN * cameraZ / spacerScale,
-        oy / (ORBIT_CAM_Z * ORBIT_TAN) * (orbitHalf / vhHalf) * WHAT_TAN * cameraZ / spacerScale,
-      ];
-      const [pinkHX, pinkHY] = orbitToLocal(-HEART_D_H_VAL, 0.18);
-      const [purpHX, purpHY] = orbitToLocal( HEART_D_M_VAL, 0.18);
+      const ringRadiusPx = lerp(compact ? 112 : 155, compact ? 147 : 220, clamp(Math.max(chemP, whatSphereCurrent.journalProgress)));
+      const viewHeightForRings = 2 * Math.tan((whatSphere3D.camera.fov * Math.PI / 180) / 2) * cameraZ;
+      const pxPerLocalUnit = (whatSphere3D.height / viewHeightForRings) * objectScale;
+      const localRingRadius = ringRadiusPx / Math.max(1, pxPerLocalUnit);
+      const ringScalar = localRingRadius / 0.82;
+      const sectionRingOpacity = smoothstep(clamp(Math.max(kp, chemP, whatSphereCurrent.journalProgress)));
+      const overlapLocal = new whatSphere3D.THREE.Vector3(
+        (whatSphere3D.centerDot.position.x + whatSphere3D.orbitDot.position.x) * 0.5,
+        (whatSphere3D.centerDot.position.y + whatSphere3D.orbitDot.position.y) * 0.5,
+        (whatSphere3D.centerDot.position.z + whatSphere3D.orbitDot.position.z) * 0.5,
+      );
+      const pinkRingCenter = whatSphere3D.centerDot.position.clone().lerp(overlapLocal, chemP);
+      const purpleRingCenter = whatSphere3D.orbitDot.position.clone().lerp(overlapLocal, chemP);
+      const ringQuat = whatSphere3D.group.quaternion.clone().invert();
 
-      // Ring scale: match orbit-ring apparent size during approach → section size
-      const matchRingScale = (orbitRadiusY) => {
-        const localR = orbitRadiusY / (ORBIT_CAM_Z * ORBIT_TAN) * orbitHalf / vhHalf * cameraZ * WHAT_TAN / spacerScale;
-        return localR / 0.82;
-      };
-
-      // Blend factor: 0 = orbit-anim driven, 1 = section driven
-      // Switches to section formula as orbitProgress reaches 1
-      const toSection = smoothstep(clamp((op - 0.88) / 0.12));
-
-      // Pink ring
-      if (whatSphere3D.pinkRingGroup) {
-        const orbitX = lerp(0, pinkHX, op);
-        const orbitY = lerp(0, pinkHY, op);
-        const sectX  = lerp(0, pinkHX, fa);
-        const sectY  = lerp(0, pinkHY, fa);
-        whatSphere3D.pinkRingGroup.position.set(
-          lerp(orbitX, sectX, toSection),
-          lerp(orbitY, sectY, toSection),
-          0,
-        );
+      if (whatSphere3D.pinkRingGroup && whatSphere3D.pinkRingMesh) {
+        whatSphere3D.pinkRingGroup.position.copy(pinkRingCenter);
+        whatSphere3D.pinkRingGroup.quaternion.copy(ringQuat);
+        whatSphere3D.pinkRingGroup.scale.setScalar(ringScalar);
+        whatSphere3D.pinkRingMesh.material.opacity = sectionRingOpacity * 0.5;
       }
-      // Rings handled entirely by orbit-rings-clock — keep invisible here
-      if (whatSphere3D.pinkRingMesh)   whatSphere3D.pinkRingMesh.material.opacity   = 0;
-      if (whatSphere3D.purpleRingMesh) whatSphere3D.purpleRingMesh.material.opacity = 0;
+
+      if (whatSphere3D.purpleRingGroup && whatSphere3D.purpleRingMesh) {
+        whatSphere3D.purpleRingGroup.position.copy(purpleRingCenter);
+        whatSphere3D.purpleRingGroup.quaternion.copy(ringQuat);
+        whatSphere3D.purpleRingGroup.scale.setScalar(ringScalar);
+        whatSphere3D.purpleRingMesh.material.opacity = sectionRingOpacity * (1 - whatSphereCurrent.journalProgress) * 0.56;
+      }
 
       // Pass orbitDot reference for orbit-rings-clock section positioning
       if (whatSphereState) {
@@ -2107,7 +2119,7 @@
     const kindredToChemistry = fixedVideoSwitch(pKindred, pChemistry);
     const chemistryToJournal = fixedVideoSwitch(pChemistry, pJournal);
     const sectionLeft = compact
-      ? lerp(lerp(35, 43, kindredToChemistry), 50, chemistryToJournal)
+      ? lerp(lerp(35, 39, kindredToChemistry), 50, chemistryToJournal)
       : lerp(lerp(65, 28, kindredToChemistry), 72, chemistryToJournal);
     const sectionTop = compact ? 62 : 52;
     const left = progress <= pApproach
@@ -2117,7 +2129,7 @@
       ? approachTop
       : lerp(approachTopAtTransition, sectionTop, approachToKindred);
     const journalScrollLift = (Math.max(0, scrollTop - whatSections[2].offsetTop) / vh) * 100;
-    const journalTopOffset = compact ? 0 : lerp(0, 8, chemistryToJournal);
+    const journalTopOffset = lerp(0, 8, chemistryToJournal);
     const releasedTop = top + journalTopOffset - journalScrollLift;
     const scale = compact ? 0.98 : 1.02;
     const depth = compact ? 1.08 : 1.12;

@@ -950,6 +950,11 @@ footer {
     transform: translate(-50%, 0);
   }
 
+  .hero.is-night-active .hero-sphere-label,
+  .hero.is-night-instant .hero-sphere-label {
+    transform: translate(-50%, calc(-50% - 28px));
+  }
+
   #heroWaitlistBtn {
     display: none !important;
   }
@@ -1018,6 +1023,20 @@ footer {
     aspect-ratio: 9 / 19;
     min-height: 0 !important;
     height: auto;
+  }
+
+  .phone.how-mobile-phone {
+    overflow: hidden;
+    isolation: isolate;
+    box-shadow:
+      0 46px 90px rgba(0,0,0,0.56),
+      0 22px 48px rgba(123,91,255,0.16),
+      0 0 0 1px rgba(255,255,255,0.05),
+      inset 0 0 0 1px rgba(255,255,255,0.04);
+  }
+
+  .phone.how-mobile-phone::before {
+    display: none;
   }
 
   .phone::before {
