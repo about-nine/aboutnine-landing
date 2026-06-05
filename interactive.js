@@ -53,7 +53,7 @@
   const WAITLIST_RATE_LIMIT_MS = 3000;
   const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const ORBIT_FRAME_RADIUS_X = 1.84;
-  const ORBIT_SPACER_WIDTH = 1.5;
+  const ORBIT_SPACER_WIDTH = 1.72;
   const HERO_SCORE_CAPTIONS = [
     {
       id: 'low',
@@ -139,6 +139,7 @@
     progress: 0,
     hourAngle: -Math.PI / 2,
     minuteAngle: -Math.PI / 2,
+    textLocked: false,
   };
 
   function setHeroScoreCaption(caption, immediate = false) {
@@ -271,6 +272,8 @@
         }
       }
     }
+    // Update WebGL sphere text for night/day state
+    if (heroClock3D?.refreshHeroText) heroClock3D.refreshHeroText();
   }
 
   function initHeroTimeGate() {
@@ -475,6 +478,27 @@
     sphere.rotation.set(-0.2, -0.28, 0.04);
     scene.add(sphere);
 
+    // Text plane starts by following the sphere roll, then locks to the front at 9pm.
+    const textCanvas = document.createElement('canvas');
+    textCanvas.width = 1024;
+    textCanvas.height = 400;
+    const textTexture = new THREE.CanvasTexture(textCanvas);
+    textTexture.colorSpace = THREE.SRGBColorSpace;
+    const textPlane = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.72, 1.34),
+      new THREE.MeshBasicMaterial({
+        map: textTexture,
+        transparent: true,
+        depthTest: true,
+        depthWrite: false,
+        side: THREE.FrontSide,
+      }),
+    );
+    // Text plane lives in the scene (not child of sphere) so sphere's Y/Z rotations
+    // don't tilt it. Only rotation.x (roll) is synced until the 9pm front lock.
+    textPlane.position.z = 1.36; // world-space: just in front of sphere surface (r=1.32)
+    scene.add(textPlane);
+
     const hourGroup = new THREE.Group();
     const hourOrbit = makeHeroCircleTube(THREE, 1.58, 0.007, 0xf4a8c8, 0.42);
     hourOrbit.rotation.x = Math.PI / 2 - 0.14;
@@ -500,7 +524,7 @@
     auroraLight.position.set(-1.2, -2.2, -0.8);
     scene.add(auroraLight);
 
-    return { scene, camera, texture, sphere, hourGroup, minuteGroup };
+    return { scene, camera, texture, sphere, hourGroup, minuteGroup, textCanvas, textTexture, textPlane };
   }
 
   function resizeHeroClock3D() {
@@ -521,7 +545,7 @@
 
   function renderHeroClock3D() {
     if (!heroClock3D) return;
-    const { progress, hourAngle, minuteAngle } = heroClockState;
+    const { progress, hourAngle, minuteAngle, textLocked } = heroClockState;
     const roll = progress * Math.PI * 5.4;
 
     resizeHeroClock3D();
@@ -529,6 +553,20 @@
     heroClock3D.sphere.rotation.y = -0.28 + Math.sin(progress * Math.PI * 2) * 0.08;
     heroClock3D.texture.offset.y = progress * -1.2;
     heroClock3D.texture.offset.x = progress * 0.14;
+
+    // Text plane orbits sphere center as it rolls — position + rotation both follow X-roll
+    // A point on the sphere surface traces (0, -r·sinθ, r·cosθ) as the sphere pitches by θ
+    if (heroClock3D.textPlane) {
+      const r = 1.36;
+      heroClock3D.textPlane.visible = !textLocked;
+      if (textLocked) {
+        heroClock3D.textPlane.position.set(0, 0, r);
+        heroClock3D.textPlane.rotation.x = 0;
+      } else {
+        heroClock3D.textPlane.position.set(0, -Math.sin(roll) * r, Math.cos(roll) * r);
+        heroClock3D.textPlane.rotation.x = roll;
+      }
+    }
 
     heroClock3D.hourGroup.rotation.z = -hourAngle;
     heroClock3D.minuteGroup.rotation.z = -minuteAngle;
@@ -551,9 +589,59 @@
       renderer.setClearColor(0x000000, 0);
       renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-      const { scene, camera, texture, sphere, hourGroup, minuteGroup } = buildHeroClockScene(THREE);
+      const { scene, camera, texture, sphere, hourGroup, minuteGroup, textCanvas, textTexture, textPlane } = buildHeroClockScene(THREE);
 
-      heroClock3D = { renderer, scene, camera, texture, sphere, hourGroup, minuteGroup, width: 0, height: 0 };
+      heroClock3D = { renderer, scene, camera, texture, sphere, hourGroup, minuteGroup, textCanvas, textTexture, textPlane, width: 0, height: 0 };
+
+      // Draw "meet your match / at nine" on sphere surface; re-draws on font load + night change
+      function refreshHeroText() {
+        const canvas = heroClock3D.textCanvas;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const W = canvas.width;
+        const H = canvas.height;
+        ctx.clearRect(0, 0, W, H);
+
+        const fontFamily = getComputedStyle(root).getPropertyValue('--font-brand').trim().replace(/"/g, '') || 'system-ui, sans-serif';
+        // Measure at target size, scale down if text overflows canvas
+        let fontSize = 128;
+        ctx.font = `600 ${fontSize}px ${fontFamily}`;
+        const testWidth = ctx.measureText('Meet your match').width;
+        if (testWidth > W * 0.96) fontSize = Math.floor(fontSize * (W * 0.96) / testWidth);
+
+        ctx.font = `600 ${fontSize}px ${fontFamily}`;
+        const lineH = fontSize * 0.98;
+        const y1 = (H - lineH * 2) / 2 + fontSize * 0.85;
+        const y2 = y1 + lineH;
+
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'alphabetic';
+        ctx.shadowColor = 'rgba(0,0,0,0.35)';
+        ctx.shadowBlur = 10;
+        ctx.shadowOffsetY = 2;
+
+        ctx.fillStyle = 'rgba(255,255,255,0.96)';
+        ctx.fillText('Meet your match', W / 2, y1);
+
+        ctx.shadowBlur = 0;
+        ctx.shadowColor = 'transparent';
+        if (isNightActive) {
+          const grad = ctx.createLinearGradient(W / 2 - 160, 0, W / 2 + 160, 0);
+          grad.addColorStop(0, '#d13588');
+          grad.addColorStop(0.5, '#9a7ad8');
+          grad.addColorStop(1, '#5e60c9');
+          ctx.fillStyle = grad;
+        } else {
+          ctx.fillStyle = 'rgba(255,255,255,0.96)';
+        }
+        ctx.fillText('at nine', W / 2, y2);
+
+        heroClock3D.textTexture.needsUpdate = true;
+      }
+
+      heroClock3D.refreshHeroText = refreshHeroText;
+      refreshHeroText();
+      document.fonts.ready.then(() => { refreshHeroText(); renderHeroClock3D(); });
 
       heroClock.classList.add('is-webgl');
       renderHeroClock3D();
@@ -817,11 +905,22 @@
     const lockX = darkRoomEl._lockX;
     const lockY = darkRoomEl._lockY;
     const startSize = darkRoomEl._startSize ?? (compact ? 270 : 580);
-    const scrollDelta = scrollTop - lockScrollTop;
 
     // orbitEnd = absolute scrollTop when sphere-approach text is centred in viewport
     const orbitEnd = sphereApproach.offsetTop + sphereApproach.offsetHeight * 0.5 - vh * 0.5;
-    const orbitProg = smoothstep(clamp(scrollDelta / Math.max(1, orbitEnd - lockScrollTop)));
+    const scrollDelta = scrollTop - lockScrollTop;
+    const RING_EXIT_SCROLL = 80;
+
+    // Stay hidden while hero rings are still sliding out of the sphere
+    if (!darkRoomEl._ringExitScrollEnd || scrollTop < darkRoomEl._ringExitScrollEnd) {
+      el.style.visibility = 'hidden';
+      return;
+    }
+
+    // Rebase: orbitProg=0 at the moment orbit rings appear, so geometry is edge-on
+    const adjustedDelta = Math.max(0, scrollDelta - RING_EXIT_SCROLL);
+    const adjustedRange = Math.max(1, orbitEnd - lockScrollTop - RING_EXIT_SCROLL);
+    const orbitProg = smoothstep(clamp(adjustedDelta / adjustedRange));
 
     const targetSize = compact ? Math.min(vw * 0.9, 520) : Math.min(vw * 0.88, 1100);
 
@@ -854,19 +953,22 @@
     el.style.visibility = 'visible';
     el.style.setProperty('--ork-opacity', '1');
 
-    const currentSize = Math.round(lerp(startSize, targetSize, orbitProg));
+    // Canvas position uses the full orbitProg so rings move smoothly toward section.
+    const EXIT_X = compact ? 10 : 13;
+    const EXIT_Y = compact ? 2 : 3;
+    const posX = lerp(lockX + EXIT_X, 50, orbitProg);
+    const posY = lerp(lockY + EXIT_Y, 50, orbitProg);
 
-    // Clamp position so the canvas never extends past the viewport edge
-    const halfXPct = (currentSize / 2 / vw) * 100;
-    const halfYPct = (currentSize / 2 / vh) * 100;
-    const clampedX = Math.max(halfXPct, Math.min(100 - halfXPct, lerp(lockX, 50, orbitProg)));
-    const clampedY = Math.max(halfYPct, Math.min(100 - halfYPct, lerp(lockY, 50, orbitProg)));
+    // Geometry animates throughout the full travel — no delay.
+    // Power easing (x^1.5) makes the initial rotation gradual so rings visibly turn
+    // in 3D as they move, rather than staying flat then snapping open.
+    const geomProg = Math.pow(orbitProg, 1.5);
 
-    el.style.setProperty('--ork-x', `${clampedX.toFixed(2)}%`);
-    el.style.setProperty('--ork-y', `${clampedY.toFixed(2)}%`);
-    el.style.setProperty('--ork-size', `${currentSize}px`);
+    el.style.setProperty('--ork-x', `${posX.toFixed(2)}%`);
+    el.style.setProperty('--ork-y', `${posY.toFixed(2)}%`);
+    el.style.setProperty('--ork-size', `${Math.round(lerp(startSize, targetSize, geomProg))}px`);
 
-    renderOrbitRings3D(orbitProg);
+    renderOrbitRings3D(geomProg);
   }
 
   function updateDarkRoomClock() {
@@ -956,13 +1058,16 @@
         heroClock3D.sphere.material.opacity = 1;
         heroClock3D.sphere.material.needsUpdate = true;
       }
-      // Restore orbit ring opacity and mesh rotations (in case of scroll-back)
+      // Restore orbit ring opacity, mesh rotations, and group positions (in case of scroll-back)
       const meshH0 = heroClock3D?.hourGroup?.children[0];
       const meshM0 = heroClock3D?.minuteGroup?.children[0];
       if (meshH0?.material) meshH0.material.opacity = 0.42;
       if (meshM0?.material) meshM0.material.opacity = 0.52;
       if (meshH0) { meshH0.rotation.x = Math.PI / 2 - 0.14; meshH0.rotation.y = 0.06; }
       if (meshM0) { meshM0.rotation.x = Math.PI / 2 - 0.06; meshM0.rotation.y = -0.04; }
+      el._ringExitScrollEnd = null;
+      if (heroClock3D?.hourGroup) heroClock3D.hourGroup.position.set(0, 0, 0);
+      if (heroClock3D?.minuteGroup) heroClock3D.minuteGroup.position.set(0, 0, 0);
 
       el.style.setProperty('--drck-x', `${lerp(startX, endX, lineProgress).toFixed(2)}%`);
       el.style.setProperty('--drck-y', `${lerp(startY, endY, lineProgress).toFixed(2)}%`);
@@ -974,24 +1079,31 @@
       heroClockState.hourAngle = (270 + clockProg * 150 - 90) * (Math.PI / 180);
       heroClockState.minuteAngle = (clockProg * 5 * 360 - 90) * (Math.PI / 180);
       heroClockState.progress = clockProg;
+      heroClockState.textLocked = true;
       renderHeroClock3D();
     } else {
-      // 2am reached: sphere scrolls up with page, rings handed off to orbit-rings-clock instantly
+      // 2am reached: rings slide out of the sphere naturally, then orbit-rings-clock takes over
+      const RING_EXIT_SCROLL = 80;
       if (el._lockScrollTop == null) {
         el._lockScrollTop = scrollTop;
         el._lockX = endX;
         el._lockY = endY;
+        el._ringExitScrollEnd = scrollTop + RING_EXIT_SCROLL;
         if (heroClock3D?.sphere?.material) {
           heroClock3D.sphere.material.transparent = true;
           heroClock3D.sphere.material.needsUpdate = true;
         }
       }
 
-      // Instantly hide hero rings — orbit-rings-clock shows identical-sized rings from this frame
+      // Slide rings toward lower-right at FULL opacity — no fade, purely physical exit.
+      // Rings are hidden only once they've cleared the sphere, when orbit-rings-clock takes over.
+      const ringExitProg = smoothstep(clamp((scrollTop - el._lockScrollTop) / RING_EXIT_SCROLL));
       const mH = heroClock3D?.hourGroup?.children[0];
       const mM = heroClock3D?.minuteGroup?.children[0];
-      if (mH?.material) mH.material.opacity = 0;
-      if (mM?.material) mM.material.opacity = 0;
+      if (heroClock3D?.hourGroup) heroClock3D.hourGroup.position.set(ringExitProg * 1.8, ringExitProg * -1.0, 0);
+      if (heroClock3D?.minuteGroup) heroClock3D.minuteGroup.position.set(ringExitProg * 1.8, ringExitProg * -1.0, 0);
+      if (mH?.material) mH.material.opacity = ringExitProg < 1 ? 0.42 : 0;
+      if (mM?.material) mM.material.opacity = ringExitProg < 1 ? 0.52 : 0;
 
       // Sphere: page-locked, scrolls up naturally
       const scrolledY = el._lockY - ((scrollTop - el._lockScrollTop) / vh * 100);
@@ -1006,6 +1118,7 @@
       heroClockState.hourAngle = 330 * Math.PI / 180;
       heroClockState.minuteAngle = 1710 * Math.PI / 180;
       heroClockState.progress = 1;
+      heroClockState.textLocked = true;
       if (heroClock3D?.sphere?.material) heroClock3D.sphere.material.opacity = 1;
 
       renderHeroClock3D();
@@ -1029,6 +1142,7 @@
         heroClockState.progress = 0;
         heroClockState.hourAngle = (hourAngle - 90) * (Math.PI / 180);
         heroClockState.minuteAngle = (minuteAngle - 90) * (Math.PI / 180);
+        heroClockState.textLocked = true;
         renderHeroClock3D();
       }
       const timeText = formatHeroClockTime(heroClockBaseTime);
@@ -1067,6 +1181,7 @@
       heroClockState.progress = progress;
       heroClockState.hourAngle = (hourAngle - 90) * (Math.PI / 180);
       heroClockState.minuteAngle = (minuteAngle - 90) * (Math.PI / 180);
+      heroClockState.textLocked = isNightActive;
       renderHeroClock3D();
     }
 

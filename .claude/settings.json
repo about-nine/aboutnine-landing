@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pkill -f \"python3 -m http.server 7890\")",
+      "Bash(python3 -m http.server 7890)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:7890/)",
+      "Bash(open -a \"Google Chrome\" \"http://localhost:7890/\")",
+      "Bash(screencapture -x /tmp/hero_real.png)",
+      "Bash(screencapture /tmp/hero_real.png)",
+      "Bash(echo \"exit:$?\")",
+      "Bash(open \"http://localhost:7890/\")",
+      "Bash(pkill -f \"python3 -m http.server 7890\" 2>/dev/null; python3 -m http.server 7890 &>/tmp/srv.log & sleep 0.5 && curl -s -o /dev/null -w \"%{http_code}\" http://localhost:7890/ && echo \" OK\")"
+    ],
+    "additionalDirectories": [
+      "/private/tmp"
+    ]
+  }
+}

@@ -121,7 +121,7 @@ body > footer {
 .orbit-rings-clock {
   position: fixed;
   pointer-events: none;
-  z-index: 0;
+  z-index: 2;
   width: var(--ork-size, 200px);
   height: var(--ork-size, 200px);
   left: var(--ork-x, 82%);
@@ -307,7 +307,7 @@ footer a:hover,
   --hero-gap: clamp(30px, 4.6vw, 76px);
   --hero-phone-width: min(380px, 24vw, 38vh);
   --hero-score-scroll: min(1180px, 128svh);
-  --hero-clock-size: min(320px, 24vw, 38vh);
+  --hero-clock-size: min(60vmin, 680px);
   display: block;
   overflow: visible;
   min-height: calc(100svh + var(--hero-score-scroll));
@@ -340,7 +340,10 @@ footer a:hover,
   top: 0;
   z-index: 2;
   display: flex;
+  flex-direction: column;
   align-items: center;
+  justify-content: center;
+  gap: clamp(20px, 3.2vh, 40px);
   width: 100%;
   height: 100svh;
   max-width: 1280px;
@@ -352,23 +355,82 @@ footer a:hover,
   padding-bottom: clamp(44px, 6vh, 72px);
 }
 
-.hero .grid {
-  width: 100%;
-  grid-template-columns: minmax(0, 1fr) var(--hero-phone-width);
-  gap: var(--hero-gap);
+.hero-sphere-label {
+  left: 50%;
+  top: 50%;
+  right: auto;
+  bottom: auto;
+  width: min(92vw, 980px);
+  transform: translate(-50%, -50%);
+  z-index: 3;
+  text-align: center;
 }
 
-.hero .grid > * {
-  min-width: 0;
+.hero.is-night-active .hero-sphere-label,
+.hero.is-night-instant .hero-sphere-label {
+  pointer-events: auto;
+}
+
+.hero-sphere-label .hero-h1-wrap {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.hero.is-night-active .hero-sphere-label .hero-h1-wrap,
+.hero.is-night-instant .hero-sphere-label .hero-h1-wrap {
+  opacity: 1 !important;
+  pointer-events: auto;
+}
+
+.hero-sphere-label h1 {
+  margin: 0;
+  color: #fff;
+  font-family: var(--font-brand);
+  font-weight: 600;
+  line-height: 0.98;
+  letter-spacing: 0;
+  text-shadow: 0 5px 18px rgba(0,0,0,0.36);
+  text-transform: none;
+}
+
+.hero-sub-wrap {
+  width: min(100%, 360px);
+  text-align: center;
+}
+
+.hero-sub-text {
+  width: 100%;
+}
+
+@media (min-width: 961px) {
+  .hero-sphere-label .hero-btn-wrap {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-top: clamp(20px, 2.6vh, 30px);
+    transform: translate(-50%, 24px);
+    white-space: nowrap;
+  }
+
+  .hero-sphere-label .hero-btn-wrap.is-visible {
+    transform: translate(-50%, 0);
+  }
+
+  .hero.is-night-active .hero-sub-wrap,
+  .hero.is-night-instant .hero-sub-wrap {
+    min-height: 1.7em;
+  }
 }
 
 .hero .phone-wrap {
-  justify-self: end;
+  position: relative;
+  justify-self: center;
   width: var(--hero-phone-width);
   max-width: none;
   min-width: 0;
   margin-left: auto;
-  margin-right: 0;
+  margin-right: auto;
 }
 
 .hero .phone-wrap::before {
@@ -828,7 +890,7 @@ footer {
     --hero-pad-x: 32px;
     --hero-phone-width: min(100%, 320px);
     --hero-score-scroll: min(980px, 112svh);
-    --hero-clock-size: min(60vw, 224px);
+    --hero-clock-size: min(72vw, 280px);
     height: calc(100svh + var(--hero-score-scroll));
     min-height: calc(100svh + var(--hero-score-scroll));
     overflow: visible;
@@ -849,16 +911,6 @@ footer {
     height: 116svh;
   }
 
-  .hero .grid {
-    display: flex;
-    flex-direction: column;
-    gap: 38px;
-  }
-
-  .hero .grid > div:first-child {
-    display: contents;
-  }
-
   .topnav .nav-links {
     display: flex;
   }
@@ -874,12 +926,6 @@ footer {
 
   .topnav .nav-cta {
     white-space: nowrap;
-  }
-
-  .hero .cta-row {
-    order: 3;
-    display: flex;
-    justify-content: center;
   }
 
   .hero-cta-col {
@@ -909,17 +955,9 @@ footer {
   }
 
   .hero .phone-wrap {
-    order: 2;
     justify-self: center;
     margin-left: auto;
     margin-right: auto;
-  }
-
-  .hero h1 {
-    order: 1;
-    font-size: 56px;
-    line-height: 1.06;
-    text-wrap: auto;
   }
 
   .hero h1 .nobreak,

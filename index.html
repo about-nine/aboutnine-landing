@@ -84,23 +84,30 @@
 
   /* ─── HERO ─── */
   .hero {
-    padding: clamp(88px, 11vh, 118px) 0 clamp(44px, 6vh, 72px);
+    padding: 0;
     position: relative;
     background: transparent;
   }
   .hero::after {
     display: none;
   }
-  .hero .grid {
-    display: grid; grid-template-columns: 1.05fr 0.95fr;
-    gap: 60px; align-items: center;
+  /* hero-sphere-label: kept in DOM for accessibility; visual text is rendered in WebGL */
+  .hero-sphere-label {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
   }
-  .hero h1 {
-    font-family: var(--font-brand); font-size: 96px; font-weight: 600;
-    letter-spacing: -2.5px; line-height: 1.02; color: #fff;
+  /* hero-info-row: sub-text + button row below sphere */
+  .hero-info-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    text-align: center;
+    width: 100%;
+    margin-top: 0;
   }
-  .hero h1 .accent { color: rgba(255,255,255,0.55); white-space: nowrap; }
-  .hero h1 .nobreak { white-space: nowrap; display: inline-block; }
   .cta-row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-top: 28px; }
   .btn {
     display: inline-flex; align-items: center; gap: 10px;
@@ -977,12 +984,10 @@
     footer .footer-row { padding: 0 32px; flex-direction: column; align-items: flex-start; gap: 12px; }
     footer .footer-meta { flex-wrap: wrap; gap: 16px; }
     section { padding: 80px 0; }
-    .hero { padding: 66px 0 0; }
-    .hero .grid { grid-template-columns: 1fr; gap: 20px; text-align: center; }
-    .hero h1 { font-size: 56px; letter-spacing: -1.5px; }
+    .hero { padding: 0; }
     .cta-row { justify-content: center; }
-    .phone-wrap { transform: none; max-width: 240px; margin: 0 auto; }
-    .hero .phone { width: 100%; min-height: 0; max-height: 45vh; overflow: hidden; }
+    .phone-wrap { transform: none; max-width: min(60vw, 240px); margin: 0 auto; }
+    .hero .phone { width: 100%; min-height: 0; overflow: hidden; }
     .phone { width: 100%; height: auto; min-height: 580px; }
     .dark-room { padding: 120px 0; }
     .dark-room .quote { font-size: 38px; letter-spacing: -0.6px; }
@@ -1470,7 +1475,7 @@
   .hero-h1-wrap { position: relative; }
   .hero-h1-night {
     position: absolute; top: 0; left: 0; width: 100%;
-    opacity: 0; transform: translateY(20px); pointer-events: none;
+    opacity: 0; transform: none; pointer-events: none;
   }
   .hero-night-accent {
     font-style: normal;
@@ -1480,7 +1485,7 @@
   }
 
   /* sub-text wrapper: same layout trick */
-  .hero-cta-col { flex-direction: column; align-items: flex-start; gap: 40px; }
+  .hero-cta-col { flex-direction: column; align-items: center; gap: 16px; }
   .hero-sub-wrap { position: relative; }
   /* identical font for both states */
   .hero-sub-text {
@@ -1488,6 +1493,7 @@
     font-size: 16px; font-style: italic;
     line-height: 1.7; color: rgba(255,255,255,0.55);
     margin: 0;
+    text-align: center;
   }
   .hero-sub-night {
     position: absolute; top: 0; left: 0; width: 100%;
@@ -1509,9 +1515,8 @@
     transition: opacity 0.3s ease;
   }
   .hero.is-night-active .hero-h1-night {
-    opacity: 1; transform: translateY(0); pointer-events: auto;
-    transition: opacity 0.9s cubic-bezier(0.16,1,0.3,1),
-                transform 0.9s cubic-bezier(0.16,1,0.3,1);
+    opacity: 1; transform: none; pointer-events: auto;
+    transition: opacity 0.9s cubic-bezier(0.16,1,0.3,1);
   }
   .hero.is-night-active .hero-sub-day {
     opacity: 0; pointer-events: none;
@@ -1603,40 +1608,37 @@
 <!-- ─── HERO ─── -->
 <section class="hero" id="top">
   <div class="container">
-    <div class="grid">
-      <div>
-        <!-- h1 wrapper: both states overlap — day in flow, night absolute on top -->
+    <!-- Sphere centered; text overlay rolls with it in 3D -->
+    <div class="phone-wrap">
+      <!-- Text overlay: rotates in 3D to follow sphere roll -->
+      <div class="hero-sphere-label">
         <div class="hero-h1-wrap">
-          <h1 class="reveal hero-h1-day"><span class="nobreak">Meet your match</span> <span class="nobreak">at nine</span></h1>
-          <h1 class="hero-h1-night" aria-hidden="true"><span class="nobreak">Meet your match</span> <em class="hero-night-accent nobreak">at nine</em></h1>
+          <h1 class="hero-h1-day"><span class="nobreak">Meet your match</span><br><span class="nobreak">at nine</span></h1>
+          <h1 class="hero-h1-night" aria-hidden="true"><span class="nobreak">Meet your match</span><br><em class="hero-night-accent nobreak">at nine</em></h1>
         </div>
-        <!-- sub-text + button: same font class, night text absolute over day -->
-        <div class="cta-row hero-cta-col reveal d1">
-          <div class="hero-sub-wrap">
-            <p class="hero-sub-text hero-sub-day">current time is <span data-hero-time-value="">--:-- am</span>.</p>
-            <p class="hero-sub-text hero-sub-night" aria-hidden="true">kindred souls matched by voice</p>
-          </div>
-          <div class="hero-btn-wrap" id="heroBtnWrap" style="display:none">
-            <a href="#cta" class="btn btn-primary" id="heroWaitlistBtn">
-              join the waitlist
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"></path></svg>
-            </a>
-          </div>
+        <div class="hero-btn-wrap" id="heroBtnWrap" style="display:none">
+          <a href="#cta" class="btn btn-primary" id="heroWaitlistBtn">
+            join the waitlist
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"></path></svg>
+          </a>
         </div>
       </div>
-
-      <!-- time visual -->
-      <div class="phone-wrap">
-        <div class="phone">
-          <div class="bezel">
-            <div class="sphere-stage hero-time-stage">
-              <div class="hero-clock" data-hero-clock aria-label="current time">
-                <canvas class="hero-clock-canvas" data-hero-clock-canvas aria-hidden="true"></canvas>
-              </div>
+      <div class="phone">
+        <div class="bezel">
+          <div class="sphere-stage hero-time-stage">
+            <div class="hero-clock" data-hero-clock aria-label="current time">
+              <canvas class="hero-clock-canvas" data-hero-clock-canvas aria-hidden="true"></canvas>
             </div>
           </div>
-          <div class="glass"></div>
         </div>
+        <div class="glass"></div>
+      </div>
+    </div>
+    <!-- Sub-text and waitlist button below sphere -->
+    <div class="cta-row hero-cta-col hero-info-row reveal d1">
+      <div class="hero-sub-wrap">
+        <p class="hero-sub-text hero-sub-day">current time is <span data-hero-time-value="">--:-- am</span>.</p>
+        <p class="hero-sub-text hero-sub-night" aria-hidden="true">kindred souls matched by voice</p>
       </div>
     </div>
   </div>
