@@ -118,7 +118,7 @@
     }
     let mins = 21 * 60 - baseMin;
     if (mins <= 0) mins += 24 * 60;
-    return Math.min(720, Math.max(120, mins + BUFFER));
+    return Math.max(120, mins + BUFFER);
   })();
   const HERO_NIGHT_HOLDS = (() => {
     const baseMin = heroClockBaseTime.getHours() * 60 + heroClockBaseTime.getMinutes() + heroClockBaseTime.getSeconds() / 60;
@@ -560,7 +560,10 @@
       const r = 1.36;
       const compactText = window.innerWidth <= 960;
       const narrowText = window.innerWidth <= 600;
-      heroClock3D.textPlane.scale.set(narrowText ? 0.48 : (compactText ? 0.64 : 1), narrowText ? 0.58 : (compactText ? 0.72 : 1), 1);
+      const mobileDayTextScale = compactText && !textLocked ? 1.25 : 1;
+      const textScaleX = narrowText ? 0.48 : (compactText ? 0.64 : 1);
+      const textScaleY = narrowText ? 0.58 : (compactText ? 0.72 : 1);
+      heroClock3D.textPlane.scale.set(textScaleX * mobileDayTextScale, textScaleY * mobileDayTextScale, 1);
       heroClock3D.textPlane.visible = !textLocked;
       if (textLocked) {
         heroClock3D.textPlane.position.set(0, 0, r);
