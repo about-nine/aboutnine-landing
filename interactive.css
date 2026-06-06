@@ -554,7 +554,34 @@ footer a:hover,
   flex: none;
   overflow: visible;
   border-radius: 0;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
   /* filter removed: Safari does not render WebGL canvas children of filtered elements */
+}
+
+.hero-clock.is-grabbing {
+  cursor: grabbing;
+}
+
+.hero.is-sphere-grabbing .hero-clock,
+.hero.is-sphere-grabbing .hero-h1-wrap {
+  cursor: grabbing;
+}
+
+.hero.is-night-active .hero-h1-wrap,
+.hero.is-night-instant .hero-h1-wrap {
+  cursor: grab;
+}
+
+.hero.is-time-scrubbing .hero-sub-day {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.hero.is-time-scrubbing .hero-sub-night {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .hero-clock-canvas {
@@ -565,6 +592,7 @@ footer a:hover,
   display: block;
   /* Safari: canvas에 독립 GPU 레이어 강제 */
   transform: translateZ(0);
+  touch-action: none;
 }
 
 .hero .phone .number {

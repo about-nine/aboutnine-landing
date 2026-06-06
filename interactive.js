@@ -141,6 +141,22 @@
     minuteAngle: -Math.PI / 2,
     textLocked: false,
   };
+  const heroSphereInteraction = {
+    active: false,
+    pointerId: null,
+    lastX: 0,
+    lastY: 0,
+    lastMoveTime: 0,
+    spinX: 0,
+    spinY: 0,
+    spinZ: 0,
+    progressOffset: 0,
+    velocityX: 0,
+    velocityY: 0,
+    velocityZ: 0,
+    raf: 0,
+    lastFrameTime: 0,
+  };
 
   function setHeroScoreCaption(caption, immediate = false) {
     if (!heroScoreCaption || heroScoreCaptionId === caption.id) return;
@@ -316,6 +332,41 @@
     return `${hours % 12 || 12}:${minutes} ${meridiem}`;
   }
 
+  function getHeroClockDisplayTime(progress, progressOffset = 0, capAtNine = true) {
+    const totalProgress = clamp(
+      progress + progressOffset,
+      0,
+      1,
+    );
+    const minutesFromProgress = Math.round(totalProgress * HERO_CLOCK_SCROLL_MINUTES);
+    const displayTime = new Date(heroClockBaseTime.getTime() + minutesFromProgress * 60000);
+    if (capAtNine && displayTime.getHours() >= 21) {
+      displayTime.setHours(21, 0, 0, 0);
+    }
+    return displayTime;
+  }
+
+  function syncHeroTimeReadout(displayTime) {
+    if (!displayTime || !heroClock) return;
+    const timeText = formatHeroClockTime(displayTime);
+    if (heroTimeValue && heroLastTimeText !== timeText) {
+      heroTimeValue.textContent = timeText;
+      heroLastTimeText = timeText;
+    }
+    heroClock.setAttribute('aria-label', `current time ${timeText}`);
+  }
+
+  function wrapAngleToPi(angle) {
+    return Math.atan2(Math.sin(angle), Math.cos(angle));
+  }
+
+  function foldAngleToFront(angle) {
+    const wrapped = wrapAngleToPi(angle);
+    if (wrapped > Math.PI / 2) return Math.PI - wrapped;
+    if (wrapped < -Math.PI / 2) return -Math.PI - wrapped;
+    return wrapped;
+  }
+
   function makeHeroPlanetTexture(THREE, palette = {}) {
     const canvas = document.createElement('canvas');
     const size = 512;
@@ -489,14 +540,15 @@
       new THREE.MeshBasicMaterial({
         map: textTexture,
         transparent: true,
-        depthTest: true,
+        depthTest: false,
         depthWrite: false,
-        side: THREE.FrontSide,
+        side: THREE.DoubleSide,
       }),
     );
     // Text plane lives in the scene (not child of sphere) so sphere's Y/Z rotations
     // don't tilt it. Only rotation.x (roll) is synced until the 9pm front lock.
     textPlane.position.z = 1.36; // world-space: just in front of sphere surface (r=1.32)
+    textPlane.renderOrder = 10;
     scene.add(textPlane);
 
     const hourGroup = new THREE.Group();
@@ -511,7 +563,9 @@
     minuteOrbit.rotation.y = -0.04;
     minuteGroup.add(minuteOrbit);
 
-    scene.add(hourGroup, minuteGroup);
+    const orbitRoot = new THREE.Group();
+    orbitRoot.add(hourGroup, minuteGroup);
+    scene.add(orbitRoot);
 
     scene.add(new THREE.AmbientLight(0xf8d8e8, 0.80));
     const keyLight = new THREE.DirectionalLight(0xffc8e0, 0.92);
@@ -524,7 +578,7 @@
     auroraLight.position.set(-1.2, -2.2, -0.8);
     scene.add(auroraLight);
 
-    return { scene, camera, texture, sphere, hourGroup, minuteGroup, textCanvas, textTexture, textPlane };
+    return { scene, camera, texture, sphere, orbitRoot, hourGroup, minuteGroup, textCanvas, textTexture, textPlane };
   }
 
   function resizeHeroClock3D() {
@@ -543,16 +597,82 @@
     heroClock3D.height = height;
   }
 
+  function hasHeroSphereMotion() {
+    const s = heroSphereInteraction;
+    return s.active
+      || Math.abs(s.velocityX) > 0.006
+      || Math.abs(s.velocityY) > 0.006
+      || Math.abs(s.velocityZ) > 0.006;
+  }
+
+  function scheduleHeroSphereMotion() {
+    if (heroSphereInteraction.raf || reduceMotion) return;
+    heroSphereInteraction.lastFrameTime = 0;
+    heroSphereInteraction.raf = requestAnimationFrame(stepHeroSphereMotion);
+  }
+
+  function stepHeroSphereMotion(time) {
+    const s = heroSphereInteraction;
+    s.raf = 0;
+
+    if (!s.lastFrameTime) s.lastFrameTime = time;
+    const dt = clamp((time - s.lastFrameTime) / 1000, 0.001, 0.05);
+    s.lastFrameTime = time;
+
+    if (!s.active) {
+      s.spinX += s.velocityX * dt;
+      s.spinY += s.velocityY * dt;
+      s.spinZ += s.velocityZ * dt;
+
+      const decay = Math.pow(0.895, dt * 60);
+      s.velocityX *= decay;
+      s.velocityY *= decay;
+      s.velocityZ *= decay;
+    }
+
+    renderHeroClock3D();
+
+    if (hasHeroSphereMotion()) {
+      s.raf = requestAnimationFrame(stepHeroSphereMotion);
+    } else {
+      s.velocityX = 0;
+      s.velocityY = 0;
+      s.velocityZ = 0;
+      s.lastFrameTime = 0;
+    }
+  }
+
   function renderHeroClock3D() {
     if (!heroClock3D) return;
     const { progress, hourAngle, minuteAngle, textLocked } = heroClockState;
-    const roll = progress * Math.PI * 5.4;
+    const s = heroSphereInteraction;
+    const effectiveProgress = clamp(
+      progress + (darkRoomClockTransiting ? 0 : s.progressOffset),
+      0,
+      1,
+    );
+    const effectiveProgressOffset = effectiveProgress - progress;
+    const displayTime = getHeroClockDisplayTime(progress, effectiveProgressOffset, true);
+    const isTimeScrubbing = !darkRoomClockTransiting && Math.abs(effectiveProgressOffset) > 0.001;
+    const isScrubbedNight = isTimeScrubbing && (displayTime.getHours() >= 21 || displayTime.getHours() < 2);
+    const effectiveTextLocked = textLocked || isScrubbedNight;
+
+    if (isTimeScrubbing) {
+      isNightActive = isScrubbedNight;
+      applyNightActiveState();
+    }
+
+    const baseRoll = -progress * Math.PI * 5.4;
+    const baseYaw = -0.28 + Math.sin(progress * Math.PI * 2) * 0.08;
+    const baseTwist = 0.04;
+    const roll = baseRoll + s.spinX;
+    const yaw = baseYaw + s.spinY;
+    const twist = baseTwist + s.spinZ * 0.34;
 
     resizeHeroClock3D();
-    heroClock3D.sphere.rotation.x = roll;
-    heroClock3D.sphere.rotation.y = -0.28 + Math.sin(progress * Math.PI * 2) * 0.08;
-    heroClock3D.texture.offset.y = progress * -1.2;
-    heroClock3D.texture.offset.x = progress * 0.14;
+    heroClock3D.sphere.rotation.set(roll, yaw, twist);
+    heroClock3D.texture.offset.y = progress * 1.2 - s.spinX * 0.045;
+    heroClock3D.texture.offset.x = progress * 0.14 + s.spinY * 0.035 + s.spinZ * 0.018;
 
     // Text plane orbits sphere center as it rolls — position + rotation both follow X-roll
     // A point on the sphere surface traces (0, -r·sinθ, r·cosθ) as the sphere pitches by θ
@@ -560,24 +680,185 @@
       const r = 1.36;
       const compactText = window.innerWidth <= 960;
       const narrowText = window.innerWidth <= 600;
-      const mobileDayTextScale = compactText && !textLocked ? 1.25 : 1;
-      const textScaleX = narrowText ? 0.48 : (compactText ? 0.64 : 1);
-      const textScaleY = narrowText ? 0.58 : (compactText ? 0.72 : 1);
+      const mobileDayTextScale = compactText && !effectiveTextLocked ? 1.25 : 1;
+      const textScaleX = narrowText ? 0.48 : (compactText ? 0.80 : 1);
+      const textScaleY = narrowText ? 0.58 : (compactText ? 0.88 : 1);
       heroClock3D.textPlane.scale.set(textScaleX * mobileDayTextScale, textScaleY * mobileDayTextScale, 1);
-      heroClock3D.textPlane.visible = !textLocked;
-      if (textLocked) {
+      heroClock3D.textPlane.visible = !effectiveTextLocked;
+      if (effectiveTextLocked) {
         heroClock3D.textPlane.position.set(0, 0, r);
-        heroClock3D.textPlane.rotation.x = 0;
+        heroClock3D.textPlane.rotation.set(0, 0, 0);
       } else {
-        heroClock3D.textPlane.position.set(0, -Math.sin(roll) * r, Math.cos(roll) * r);
-        heroClock3D.textPlane.rotation.x = roll;
+        const textRoll = wrapAngleToPi(roll);
+        const textYaw = wrapAngleToPi(yaw + 0.28);
+        const textTwist = clamp(twist - 0.04, -0.4, 0.4);
+        const facing = Math.cos(textRoll) * Math.cos(textYaw);
+        const FADE = 0.28;
+        heroClock3D.textPlane.visible = facing > -FADE;
+        heroClock3D.textPlane.material.opacity = clamp((facing + FADE) / (FADE * 2), 0, 1);
+        if (heroClock3D.textSurfaceEuler) {
+          heroClock3D.textSurfaceEuler.set(textRoll, textYaw, textTwist, 'XYZ');
+          heroClock3D.textPlane.position.set(0, 0, r).applyEuler(heroClock3D.textSurfaceEuler);
+          heroClock3D.textPlane.rotation.set(textRoll, textYaw, textTwist);
+        } else {
+          heroClock3D.textPlane.position.set(0, -Math.sin(textRoll) * r, Math.cos(textRoll) * r);
+          heroClock3D.textPlane.rotation.x = textRoll;
+        }
       }
     }
 
-    heroClock3D.hourGroup.rotation.z = -hourAngle;
-    heroClock3D.minuteGroup.rotation.z = -minuteAngle;
+    if (heroClock3D.orbitRoot) heroClock3D.orbitRoot.rotation.set(0, 0, 0);
+    const dragMinutes = effectiveProgressOffset * HERO_CLOCK_SCROLL_MINUTES;
+    const dragHourAngle = (dragMinutes / (12 * 60)) * Math.PI * 2;
+    const dragMinuteAngle = (dragMinutes / 60) * Math.PI * 2;
+    heroClock3D.hourGroup.rotation.z = -(hourAngle + dragHourAngle);
+    heroClock3D.minuteGroup.rotation.z = -(minuteAngle + dragMinuteAngle);
+    hero?.classList.toggle('is-time-scrubbing', isTimeScrubbing);
+    syncHeroTimeReadout(displayTime);
 
     heroClock3D.renderer.render(heroClock3D.scene, heroClock3D.camera);
+  }
+
+  function setupHeroSphereInteraction() {
+    if (!hero || !heroClock || !heroClockCanvas || reduceMotion) return;
+
+    const getRadius = () => {
+      const rect = heroClockCanvas.getBoundingClientRect();
+      return Math.max(120, Math.min(rect.width, rect.height) * 0.245);
+    };
+
+    const getTimeDragDistance = () => Math.max(420, (window.innerHeight || 1) * 0.9);
+
+    const isInsideSphere = (event) => {
+      const rect = heroClockCanvas.getBoundingClientRect();
+      const radius = getRadius() * 1.2;
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      return Math.hypot(event.clientX - centerX, event.clientY - centerY) <= radius;
+    };
+
+    const start = (event) => {
+      if (event.button !== undefined && event.button !== 0) return;
+      if (!hero.contains(event.target)) return;
+      if (event.target.closest?.('a, button, input, textarea, select')) return;
+      if (!isInsideSphere(event)) return;
+      const s = heroSphereInteraction;
+      s.active = true;
+      s.pointerId = event.pointerId;
+      s.lastX = event.clientX;
+      s.lastY = event.clientY;
+      s.lastMoveTime = performance.now();
+      s.velocityX = 0;
+      s.velocityY = 0;
+      s.velocityZ = 0;
+      hero.classList.add('is-sphere-grabbing');
+      heroClock.classList.add('is-grabbing');
+      hero.setPointerCapture?.(event.pointerId);
+      event.preventDefault();
+      scheduleHeroSphereMotion();
+    };
+
+    const move = (event) => {
+      const s = heroSphereInteraction;
+      if (!s.active || s.pointerId !== event.pointerId) return;
+
+      const now = performance.now();
+      const dt = Math.max(12, now - s.lastMoveTime);
+      const dx = event.clientX - s.lastX;
+      const dy = event.clientY - s.lastY;
+      const radius = getRadius();
+      const rect = heroClockCanvas.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const localX = clamp((event.clientX - centerX) / radius, -1.4, 1.4);
+      const localY = clamp((event.clientY - centerY) / radius, -1.4, 1.4);
+      const rollX = dy / radius;
+      const rollY = dx / radius;
+      const edgeTwist = ((dx * localY) - (dy * localX)) / radius;
+      const inputGain = 1.18;
+      const spinXGain = (5.4 * Math.PI * radius) / getTimeDragDistance();
+      const rollDelta = rollX * spinXGain;
+      const requestedTimeProgressDelta = -dy / getTimeDragDistance();
+      const currentProgress = clamp(heroClockState.progress + s.progressOffset, 0, 1);
+      const timeProgressDelta = clamp(
+        requestedTimeProgressDelta,
+        -currentProgress,
+        1 - currentProgress,
+      );
+      const timeDeltaRatio = Math.abs(requestedTimeProgressDelta) > 0.000001
+        ? timeProgressDelta / requestedTimeProgressDelta
+        : 1;
+
+      // 9시(최대 progress)에 도달한 상태에서 계속 위로 드래그하면 페이지 스크롤로 전환
+      if (currentProgress >= 0.9999 && requestedTimeProgressDelta > 0.0001) {
+        const scroller = document.scrollingElement || document.documentElement;
+        scroller.scrollTop -= dy;
+        s.lastX = event.clientX;
+        s.lastY = event.clientY;
+        s.lastMoveTime = now;
+        event.preventDefault();
+        scheduleHeroSphereMotion();
+        return;
+      }
+
+      s.spinX += rollDelta * timeDeltaRatio;
+      s.spinY += rollY * inputGain;
+      s.spinZ += edgeTwist * 0.34;
+      s.progressOffset = clamp(
+        s.progressOffset + timeProgressDelta,
+        -heroClockState.progress,
+        1 - heroClockState.progress,
+      );
+      s.velocityX = lerp(s.velocityX, (rollX * spinXGain * timeDeltaRatio * 1000) / dt, 0.42);
+      s.velocityY = lerp(s.velocityY, (rollY * inputGain * 1000) / dt, 0.42);
+      s.velocityZ = lerp(s.velocityZ, (edgeTwist * 0.34 * 1000) / dt, 0.34);
+      s.lastX = event.clientX;
+      s.lastY = event.clientY;
+      s.lastMoveTime = now;
+      event.preventDefault();
+      scheduleHeroSphereMotion();
+    };
+
+    const stop = (event) => {
+      const s = heroSphereInteraction;
+      if (!s.active || s.pointerId !== event.pointerId) return;
+      s.active = false;
+      s.pointerId = null;
+      hero.classList.remove('is-sphere-grabbing');
+      heroClock.classList.remove('is-grabbing');
+      hero.releasePointerCapture?.(event.pointerId);
+
+      // 드래그로 9시에 도달한 채 손을 떼면, scrollTop을 hero 끝까지 즉시 점프.
+      // progressOffset만 높고 실제 scrollTop이 낮으면 빈 스크롤 구간이 생기는 버그 수정.
+      const effectiveProgress = clamp(heroClockState.progress + s.progressOffset, 0, 1);
+      if (effectiveProgress >= 0.9999 && s.progressOffset > 0.01 && !darkRoomClockTransiting) {
+        const scroller = document.scrollingElement || document.documentElement;
+        const vh = window.innerHeight || 1;
+        const targetScrollTop = (hero.offsetTop || 0) + Math.max(0, hero.offsetHeight - vh);
+        if (scroller.scrollTop < targetScrollTop) {
+          scroller.scrollTop = targetScrollTop;
+          s.progressOffset = 0;
+          // 잔류 spin/velocity 제거 — dark-room 전환 시 구체가 추가로 돌지 않도록
+          s.spinX = 0; s.spinY = 0; s.spinZ = 0;
+          s.velocityX = 0; s.velocityY = 0; s.velocityZ = 0;
+          updateHeroClockVisual(targetScrollTop);
+        }
+      }
+
+      scheduleHeroSphereMotion();
+    };
+
+    hero.addEventListener('pointerdown', start);
+    hero.addEventListener('pointermove', move);
+    hero.addEventListener('pointerup', stop);
+    hero.addEventListener('pointercancel', stop);
+    hero.addEventListener('lostpointercapture', () => {
+      heroSphereInteraction.active = false;
+      heroSphereInteraction.pointerId = null;
+      hero.classList.remove('is-sphere-grabbing');
+      heroClock.classList.remove('is-grabbing');
+      scheduleHeroSphereMotion();
+    });
   }
 
   async function initHeroClock3D() {
@@ -595,9 +876,25 @@
       renderer.setClearColor(0x000000, 0);
       renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-      const { scene, camera, texture, sphere, hourGroup, minuteGroup, textCanvas, textTexture, textPlane } = buildHeroClockScene(THREE);
+      const { scene, camera, texture, sphere, orbitRoot, hourGroup, minuteGroup, textCanvas, textTexture, textPlane } = buildHeroClockScene(THREE);
 
-      heroClock3D = { renderer, scene, camera, texture, sphere, hourGroup, minuteGroup, textCanvas, textTexture, textPlane, width: 0, height: 0 };
+      heroClock3D = {
+        THREE,
+        renderer,
+        scene,
+        camera,
+        texture,
+        sphere,
+        orbitRoot,
+        hourGroup,
+        minuteGroup,
+        textCanvas,
+        textTexture,
+        textPlane,
+        textSurfaceEuler: new THREE.Euler(),
+        width: 0,
+        height: 0,
+      };
 
       // Draw "meet your match / at nine" on sphere surface; re-draws on font load + night change
       function refreshHeroText() {
@@ -612,7 +909,7 @@
         // Measure at target size, scale down if text overflows canvas
         const compactText = window.innerWidth <= 960;
         const narrowText = window.innerWidth <= 600;
-        let fontSize = narrowText ? 104 : (compactText ? 116 : 128);
+        let fontSize = narrowText ? 104 : (compactText ? 116 : 90);
         ctx.font = `600 ${fontSize}px ${fontFamily}`;
         const testWidth = ctx.measureText('Meet your match').width;
         if (testWidth > W * 0.96) fontSize = Math.floor(fontSize * (W * 0.96) / testWidth);
@@ -652,6 +949,7 @@
       document.fonts.ready.then(() => { refreshHeroText(); renderHeroClock3D(); });
 
       heroClock.classList.add('is-webgl');
+      setupHeroSphereInteraction();
       renderHeroClock3D();
       updateHeroClockVisual();
       initOrbitRingsClock3D(THREE);
@@ -1175,12 +1473,7 @@
         heroClockState.textLocked = true;
         renderHeroClock3D();
       }
-      const timeText = formatHeroClockTime(heroClockBaseTime);
-      if (heroTimeValue && heroLastTimeText !== timeText) {
-        heroTimeValue.textContent = timeText;
-        heroLastTimeText = timeText;
-      }
-      heroClock.setAttribute('aria-label', `current time ${timeText}`);
+      syncHeroTimeReadout(getHeroClockDisplayTime(0, heroSphereInteraction.progressOffset, true));
       return;
     }
 
@@ -1189,17 +1482,12 @@
       ? Math.max(rawProgress, heroNightLockProgress)
       : rawProgress;
     const progress = reduceMotion ? 0 : applyProgressHolds(effectiveRawProgress, HERO_NIGHT_HOLDS);
-    const minutesFromScroll = Math.round(progress * HERO_CLOCK_SCROLL_MINUTES);
-    const displayTime = new Date(heroClockBaseTime.getTime() + minutesFromScroll * 60000);
-    if (displayTime.getHours() >= 21) {
-      displayTime.setHours(21, 0, 0, 0);
-    }
+    const displayTime = getHeroClockDisplayTime(progress, 0, true);
     const hours = displayTime.getHours();
     const minutes = displayTime.getMinutes();
     const seconds = displayTime.getSeconds();
     const minuteAngle = ((minutes + seconds / 60) / 60) * 360;
     const hourAngle = (((hours % 12) + minutes / 60 + seconds / 3600) / 12) * 360;
-    const timeText = formatHeroClockTime(displayTime);
 
     isNightActive = hours >= 21 || hours < 2;
     if (isNightActive && heroNightLockProgress === null) {
@@ -1215,12 +1503,7 @@
       renderHeroClock3D();
     }
 
-    if (heroTimeValue && heroLastTimeText !== timeText) {
-      heroTimeValue.textContent = timeText;
-      heroLastTimeText = timeText;
-    }
-
-    heroClock.setAttribute('aria-label', `current time ${timeText}`);
+    syncHeroTimeReadout(getHeroClockDisplayTime(progress, heroSphereInteraction.progressOffset, true));
   }
 
   function showWaitlistMessage(text, type) {
